@@ -1,0 +1,151 @@
+---
+title: "Get Upstream Basin Characteristics"
+author: "Katie Wampler"
+date: "2026-01-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+source(here::here("SOPs/Analysis/upstream-basins/util-functions.R")) #load util functions
+library(magrittr) #for pipes
+```
+
+# Introduction
+
+When studying watersheds it is often useful to consider the associated landscape and climate characteristics associated with a site and watershed. While it is easy to pull data (i.e., elevation, average precipitation) at the site location, this is often not representative of the entire basin which contributes streamflow to the sampling site.
+
+In order to better describe the site and watershed characteristics we often average a metric across the upstream area using a shapefile of the area upstream from a site and spatial raster layer. However, obtaining a shapefile for the area upstream of a site is not a trivial process.
+
+This script and workflow is used to obtain those upstream area basins for a set of sites using the USGS StreamStats [batch processor](https://streamstats.usgs.gov/ss/?BP=submitBatch) to obtain the basins.
+
+# Getting Started
+
+## Preparing the Data
+
+To use this workflow you need a `.csv` containing:
+
+1.  site names (`siteID`)
+
+2.  associated stream names (`locality`)
+
+3.  latitude and longitude of the sites (`latitude` and `longitude`)
+
+Columns should match the names in parenthesis.
+
+## Installing Tools
+
+### Whitebox
+
+To run this workflow you'll need the `WhiteboxTools` library, which is an advanced geospatial data analysis platform developed by Prof. John Lindsay at the University of Guelph's Geomorphometry and Hydrogeomatics Research Group.
+
+Download it using the following code:
+
+```{r eval=FALSE}
+install.packages("whitebox")
+whitebox::install_whitebox()
+```
+
+### GIS Software
+
+This method is semi-automated, and will require use of GIS software to manually check and potential adjust points to ensure they are correctly on the stream network. A good option is [QGIS](https://qgis.org/) which is free and open source. 
+
+### R Packages 
+
+You will also need the following R packages, so install them now if you haven't already. 
+
+```{r eval=FALSE}
+#for geospatial analysis work
+  install.packages("terra")
+  install.packages("tidyterra")
+  install.packages("sf")
+
+#for grabbing data
+  install.packages("nhdplusTools")
+
+#for data manipulation 
+  install.package("dplyr")
+  install.package("tidyr")
+  install.packages("stringr")
+  install.package("ggplot2")
+  install.packages("ggrepel")
+```
+
+
+# Step 1: Preparing for StreamStats
+
+## User Specified Information
+
+Here you'll provide the code with the information needed to run the workflow. This includes:
+
+-   `site_csv`: the file path to the `.csv` with the site information
+-   `data_wd`: the file path where you want all the spatial data saved (e.g., `data/spatial-data`)
+-   `study_code`: the study code associated with the sites, this is used for naming files
+-   `huc_code`: the HUC number for the basin encompassing all your sites, this is used for grabbing stream data
+-   `region`: the two digit state or region code associated with the sites.
+
+```{r}
+site_csv <- "SOPs/Analysis/upstream-basins/example-data/example-sites.csv"
+data_wd <- "SOPs/Analysis/upstream-basins/example-data/"
+study_code <- "example"
+huc_code <- 17090004
+region <- "OR"
+```
+
+## Download Spatial Data 
+
+First we'll download and save the layers needed to ensure our points are ready for StreamStats:  
+
+- NHDplus stream flowlines: used to check our sites and basins
+- Streamgrid raster: used by StreamStats to perform basin delineations 
+- A geopackage (`.gpkg`) of the sites for future use 
+
+Then we'll snap our sites to the StreamStats streamgrid which is used for basin delineations. These snapped points will be saved as a `.zip` file in `data_wd` which can be uploaded to StreamStats. All these steps can be accomplished with the `pre_streamstats` function.
+
+```{r}
+snap_sites <- prep_streamstats(site_csv = site_csv,
+                 data_wd = data_wd, 
+                 study_code = study_code,
+                 huc_code = huc_code)
+```
+## Manually Check Points 
+
+Once the points have been snapped, it is important to manually check them. The stream grid 
+does not always line up with the NHDplus streams or snapping may have moved a site to wrong stream. It is **highly** recommended to load the following layers into a GIS program of your choice (like QGIS) and check each point: 
+
+- *-stremstats-grid.tif
+- *-nhd-streams.gpkg
+- *-sites_adj.gpkg
+- snapped-*-sites.shp
+
+If there are points that need to be adjusted, edit the `*-sites_adj.gpkg` shapefile. Then rerun the `prep_streamstats` function. If there's an `*-sites_adj.gpkg` file in the `data_wd` the function will use that instead for snapping. 
+
+# Step 2: Getting StreamStats Data 
+
+## Downloading Data
+
+We can automatically use R to get the upstream basins using the USGS API. This is done using the following function which takes the snapped points and the two letter code for the state or region. Depending on the number of sites you have, this can take a few minutes.
+
+```{r}
+basins <- get_streamstats(snap_sites, region=region)
+plot(basins[,1])
+```
+
+## Checking Basins 
+
+StreamStats' outputs are only as good as the points you give it. While we already checked to make sure they looked like they were in the right spot, let's double check that the correct stream is being delinated. 
+
+```{r}
+validate_streamstats(basins, data_wd, study_code) 
+```
+
+The function will: 
+
+1.  Save each upstream basin area as it's own `.gpkg` 
+2.  Create a plot zoomed into the site showing the expected name of the stream based on the locality column provided in the site data and the stream names associated with the delineated basin.
+3. Create a plot showing the entire upstream basin area with the stream network. 
+
+## TODO: add plot examples here
+
+# Step 3: Get Landscape Characteristics
+
