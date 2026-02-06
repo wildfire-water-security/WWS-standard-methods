@@ -126,7 +126,14 @@ Once the points have been snapped, it is important to manually check them. The s
 -   \*-sites_adj.gpkg
 -   snapped-\*-sites.shp
 
-If there are points that need to be adjusted, edit the `*-sites_adj.gpkg` shapefile. Then rerun the `prep_streamstats` function. If there's an `*-sites_adj.gpkg` file in the `data_wd` the function will use that instead for snapping.
+If there are points that need to be adjusted, edit the `*-sites_adj.gpkg` shapefile.
+
+Once you've adjusted your points, you'll need to resnap them to the grid, do this using the `snap_streamstats` function.
+
+```{r}
+  snap_sites <- snap_streamstats(data_wd = data_wd, 
+                                 study_code = study_code)
+```
 
 # Step 2: Getting StreamStats Data
 
