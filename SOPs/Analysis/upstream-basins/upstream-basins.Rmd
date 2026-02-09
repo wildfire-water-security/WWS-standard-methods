@@ -15,9 +15,9 @@ library(magrittr) #for pipes
 
 When studying watersheds it is often useful to consider the associated landscape and climate characteristics associated with a site and watershed. While it is easy to pull data (i.e., elevation, average precipitation) at the site location, this is often not representative of the entire basin which contributes streamflow to the sampling site.
 
-In order to better describe the site and watershed characteristics we often average a metric across the upstream area using a shapefile of the area upstream from a site and spatial raster layer. However, obtaining a shapefile for the area upstream of a site is not a trivial process.
+In order to better describe the site and watershed characteristics we often average a metric across the upstream area using a polygon of the area upstream from a site and spatial raster layer. However, obtaining a polygon for the area upstream of a site is not a trivial process.
 
-This script and workflow is used to obtain those upstream area basins for a set of sites using the USGS StreamStats [batch processor](https://streamstats.usgs.gov/ss/?BP=submitBatch) to obtain the basins.
+This script and workflow is used to obtain those upstream area basins for a set of sites using the USGS [StreamStats API](https://streamstats.usgs.gov/ss-delineate/docs) to obtain the basins.
 
 # Getting Started
 
@@ -65,7 +65,7 @@ You will also need the following R packages, so install them now if you haven't 
   install.packages("elevatr")
   install.packages("prism")
   install.packages("FedData")
-  install.packages("SoilDB")
+  install.packages("soilDB")
   
 #for data manipulation 
   install.packages("dplyr")
@@ -80,13 +80,13 @@ You will also need the following R packages, so install them now if you haven't 
 
 ## User Specified Information
 
-Here you'll provide the code with the information needed to run the workflow. This includes:
+Here you'll provide the information needed to run the workflow. This includes:
 
 -   `site_csv`: the file path to the `.csv` with the site information or a `data.frame` with site data. The table needs to have the following columns at a minimum:
-    -   `siteID`
-    -   `locality`
-    -   `latitude`
-    -   `longitude`
+    -   `siteID`: the site name
+    -   `locality`: the stream name or site name
+    -   `latitude`: latitude of site
+    -   `longitude`: longitude of site
 -   `data_wd`: the file path where you want all the spatial data saved (e.g., `data/spatial-data`)
 -   `study_code`: the study code associated with the sites, this is used for naming files
 -   `huc_code`: the HUC number for the basin encompassing all your sites, this is used for grabbing stream data
@@ -104,11 +104,11 @@ region <- "OR"
 
 First we'll download and save the layers needed to ensure our points are ready for StreamStats:
 
--   NHDplus stream flowlines: used to check our sites and basins
--   Streamgrid raster: used by StreamStats to perform basin delineations
+-   NHDplus stream flowlines (`.gpkg`): used to check our sites and basins
+-   Streamgrid raster (`.tif`): used by StreamStats to perform basin delineations
 -   A geopackage (`.gpkg`) of the sites for future use
 
-Then we'll snap our sites to the StreamStats streamgrid which is used for basin delineations. These snapped points will be saved as a `.zip` file in `data_wd` which can be uploaded to StreamStats. All these steps can be accomplished with the `pre_streamstats` function.
+Then we'll snap our sites to the StreamStats streamgrid which is used for basin delineations. All these steps can be accomplished with the `pre_streamstats` function.
 
 ```{r}
 snap_sites <- prep_streamstats(site_csv = site_csv,
@@ -119,12 +119,12 @@ snap_sites <- prep_streamstats(site_csv = site_csv,
 
 ## Manually Check Points
 
-Once the points have been snapped, it is important to manually check them. The stream grid does not always line up with the NHDplus streams or snapping may have moved a site to wrong stream. It is **highly** recommended to load the following layers into a GIS program of your choice (like QGIS) and check each point:
+Once the points have been snapped, it is important to manually check them. The stream grid does not always line up with the NHDplus streams or snapping may have moved a site to wrong stream. It is **highly** recommended to load the following layers into a GIS program of your choice (like QGIS) and check each point. I would recommend loading the following layers into GIS:
 
--   \*-streamstats-grid.tif
--   \*-nhd-streams.gpkg
--   \*-sites_adj.gpkg
--   snapped-\*-sites.shp
+-   `*-streamstats-grid.tif`
+-   `*-nhd-streams.gpkg`
+-   `*-sites_adj.gpkg`
+-   `snapped-*-sites.gpkg`
 
 If there are points that need to be adjusted, edit the `*-sites_adj.gpkg` shapefile.
 
@@ -139,7 +139,7 @@ Once you've adjusted your points, you'll need to resnap them to the grid, do thi
 
 ## Downloading Data
 
-We can automatically use R to get the upstream basins using the USGS API. This is done using the following function which takes the snapped points and the two letter code for the state or region. Depending on the number of sites you have, this can take a few minutes.
+We can use R to automatically get the upstream basins using the USGS API. This is done using the following function which takes the snapped points and the two letter code for the state or region. Depending on the number of sites you have, this can take a few minutes.
 
 ```{r}
 basins <- get_streamstats(snap_sites, region=region)
@@ -148,7 +148,7 @@ plot(basins[,1])
 
 ## Checking Basins
 
-StreamStats' outputs are only as good as the points you give it. While we already checked to make sure they looked like they were in the right spot, let's double check that the correct stream is being delinated.
+StreamStats' outputs are only as good as the points you give it. While we already checked to make sure they looked like they were in the right spot, let's double check that the correct stream is being delineated.
 
 ```{r}
 validate_streamstats(basins, data_wd, study_code) 
@@ -170,7 +170,7 @@ plot(sf::read_sf(here::here("SOPs/Analysis/upstream-basins/example-data/example-
 
     ![](example-data/example-basins/check-plots/E543_full.png){width="382"}
 
-> If any of the basins are incorrect, adjust the point in `*-sites_adj.gpkg` and rerun `prep_streamstats`, `get_streamstats` and `validate_streamstats`.
+> If any of the basins are incorrect, adjust the point in `*-sites_adj.gpkg` and rerun `snap_streamstats`, `get_streamstats` and `validate_streamstats`.
 
 # Step 3: Get Landscape Characteristics
 
@@ -188,7 +188,7 @@ Now we'll use the `calc_basin_metrics` function to get the average elevation acr
 
 -   `data` Either a file path to a raster (`.tif`, `.tiff`, or `.aig`) or a `spatRaster` object.
 -   `data_name` A character description of the data layer, used as the column name for the output `data.frame`.
--   `basins` An object of class `sf` containing the StreamStats basins, likely an output from `get_streamstats` or the file path to a directory with the basin files saved as `shp` or `gpkg` files.
+-   `basins` An object of class `sf` containing the StreamStats basins, likely an output from `get_streamstats` or the file path to a directory with the basin files saved as `.shp` or `.gpkg` files.
 -   `calc` Function used to summarise the `data` layer, options include: mean, min, max, sum, isNA, notNA, percent.
 
 ```{r}
@@ -231,6 +231,7 @@ This function can be used for a wide variety of raster layers some potential sug
     ```{r}
     NLCD <- FedData::get_nlcd(basin, label=study_code, year=2019)
     terra::plot(NLCD)
+    major_land_class <- calc_basin_metrics(NLCD, "landuse", basins, calc="mode")
     ```
 
 -   soil characteristics (`SoilDB`), specified by the STATSGO mukey.

@@ -337,7 +337,7 @@ validate_streamstats <- function(basins, data_wd, study_code){
 #' @param data_name A character description of the data layer, used as the column name for the output `data.frame`.
 #' @param basins An object of class `sf` containing the streamstats basins, likely an output from `get_streamstats` or the file path to
 #' a directory with the basin files saved as `shp` or `gpkg` files.
-#' @param calc Function used to summarise the `data` layer, options include: mean, min, max, sum, isNA, notNA, percent.
+#' @param calc Function used to summarise the `data` layer, options include: mean, min, max, sum, isNA, notNA, percent, mode.
 #'
 #' @returns A `data.frame` with rows equal to the number of basins in `basins` and two columns: the siteID and the `data_name` with the
 #' calculated value.
@@ -353,7 +353,7 @@ validate_streamstats <- function(basins, data_wd, study_code){
 #' @examples
 calc_basin_metrics <- function(data, data_name, basins, calc){
   stopifnot(inherits(data, "SpatRaster") || file.exists(data),
-            inherits(basins, "sf") || dir.exists(basins), calc %in% c("mean", "min", "max", "sum", "isNA", "notNA", "percent"),
+            inherits(basins, "sf") || dir.exists(basins), calc %in% c("mean", "min", "max", "sum", "isNA", "notNA", "percent", "mode"),
             is.character(data_name))
 
   #get data if only path is provided
@@ -376,7 +376,11 @@ calc_basin_metrics <- function(data, data_name, basins, calc){
       val_bsn <- as.numeric(unname(terra::zonal(data_crop, basin, fun = "notNA")))
 
       val <- val_sum / val_bsn #calculate the percentage
-    }else{
+    }else if(calc == "mode"){
+      val <- terra::extract(data_crop, basin, fun = table)
+      val <- colnames(val)[which.max(val[1,])]
+
+      }else{
       val <- as.numeric(unname(terra::zonal(data_crop, basin, fun = calc)))
     }
 
@@ -388,6 +392,197 @@ calc_basin_metrics <- function(data, data_name, basins, calc){
   basin_stats[[data_name]] <- basin_vals
 
   return(basin_stats)
+}
+
+#' Download and document data to get landscape characteristics
+#'
+#' Uses R packages to download commonly useful landscape metrics at the overall
+#' basin scale which can be used to calculate basin metrics.
+#'
+#' @param data_wd File path where you want all the spatial data saved (e.g., `data/spatial-data`).
+#' @param huc_code HUC number for the basin encompassing all your sites, this is used for grabbing stream data.
+#' @param layers The datasets to download, see details for detailed information about the layer options.
+#' @param NLCD_year An integer representing the year of desired NLCD product. Acceptable values are 2021, 2019 (default), 2016, 2011, 2008, 2006, 2004, and 2001.
+#'
+#' @returns Saves rasters to `file.path(data_wd, "landscape-rasters")` as `.tif` files
+#' @export
+#' @md
+#'
+#' @details
+#' Available options for `layers` include:
+#' - `elev`: Elevation in meters; from `elevator` package.
+#' - `slope`: Slope in degrees; from `elevator` package.
+#' - `aspect`: Aspect classified into the 8 secondary intercardinal directions; from `elevator` package.
+#' - `temp`: Minimum, mean, and maximum 30-year normal temperature; from `prism` package.
+#'
+#'
+#' @examples
+landscape_rasters <- function(data_wd, huc_code = NULL,
+                              layers = c("elev", "slope", "aspect", "temp", "precip", "landuse"),
+                              NLCD_year = 2019){
+  stopifnot(dir.exists(data_wd), is.null(huc_code) | is.numeric(huc_code), all(is.character(layers)))
+
+  #create spot for landscape layers
+  dir.create(file.path(data_wd, "landscape-rasters"), showWarnings = FALSE)
+
+  #create df to store landscape metadata
+  metadata <- data.frame(name=character(), filename=character(),
+                         source=character(), description = character(), notes = character())
+
+  #get overall basin
+    basin_file <- list.files(data_wd, pattern = "-basin\\.gpkg")
+    if(length(basin_file) > 0){basin <- sf::read_sf(file.path(data_wd, basin_file))
+     }else{
+      huc_code <- as.character(huc_code)
+      type <- stringr::str_pad(nchar(huc_code), 2, side="left", pad="0")
+      stopifnot(type %in% c("02", "04", "06", "08", "10", "12"))
+
+      basin <- nhdplusTools::get_huc(id=huc_code, type=paste0("huc",type))}
+
+  #get elevation related data
+  if(any(layers %in% c("elev", "slope", "aspect"))){
+    message("getting elevation data...")
+    elev <- elevatr::get_elev_raster(basin, z=11, prj = terra::crs(basin)) #~30 m resolution
+    elev <- terra::rast(elev) #convert from old raster format to new terra format
+
+    #get elevation
+    if("elev" %in% layers){
+      terra::writeRaster(elev, file.path(data_wd, "landscape-rasters",paste0("elev-", basin$id, ".tif")), overwrite =TRUE)
+      metadata <- rbind(metadata,
+                        data.frame(name = "elev",
+                                   filename = paste0("elev-", basin$id, ".tif"),
+                                   source = "elevatr package in R; OpenTopography API global dataset",
+                                   description = "Elevation in meters",
+                                   notes = "zoom level of 11, resulting in ~30m resolution"))
+
+    }
+
+    #get slope
+    if("slope" %in% layers){
+      slope <- terra::terrain(elev, v="slope")
+      terra::writeRaster(slope, file.path(data_wd, "landscape-rasters",paste0("slope-", basin$id, ".tif")), overwrite =TRUE)
+      metadata <- rbind(metadata,
+                        data.frame(name = "slope",
+                                   filename = paste0("slope-", basin$id, ".tif"),
+                                   source = "elevatr package in R; OpenTopography API global dataset",
+                                   description = "Slope in degrees",
+                                   notes = "zoom level of 11, resulting in ~30m resolution"))
+    }
+
+    #get aspect
+    if("aspect" %in% layers){
+      aspect <- terra::terrain(elev, v="aspect")
+      #reclassify
+      m <- c(0, 22.5, 1,
+             22.5, 67.5, 2,
+             67.5, 112.5, 3,
+             112.5, 157.5, 4,
+             157.5, 202.5, 5,
+             202.5, 247.5, 6,
+             247.5, 292.5, 7,
+             292.5, 337.5, 8,
+             337.5, 360, 9)
+      rclmat <- matrix(m, ncol=3, byrow=TRUE)
+      aspect_reclass <- classify(aspect, rclmat, include.lowest=TRUE)
+      levels(aspect_reclass) <- data.frame(id=1:9, aspect=c("N", "NE", "E", "SE",
+                                                            "S", "SW", "W", "NW", "W"))
+      terra::writeRaster(aspect, file.path(data_wd, "landscape-rasters",paste0("aspect-", basin$id, ".tif")), overwrite =TRUE)
+
+      metadata <- rbind(metadata,
+                        data.frame(name = "aspect",
+                                   filename = paste0("aspect-", basin$id, ".tif"),
+                                   source = "elevatr package in R; OpenTopography API global dataset",
+                                   description = "Aspect, classified into the 8 secondary intercardinal directions",
+                                   notes = "zoom level of 11, resulting in ~30m resolution"))
+    }
+
+
+
+  }
+
+  #get landuse related data
+  if("landuse" %in% layers){
+    message("getting landuse data...")
+
+    NLCD <- FedData::get_nlcd(basin, label=basin$id, year=NLCD_year)
+
+    #get raster of 1/0 for each landuse
+    covers <- unique(NLCD)
+
+    save_landuse <- function(x){
+      cover <- droplevels(NLCD, setdiff(covers$Class,x))
+      cover <- as.numeric(cover)
+      cover[is.na(cover)] <- 0
+
+      name <- abbreviate(gsub("[/]|[(]|[)]", " ", x), minlength=3)
+      terra::writeRaster(cover, file.path(data_wd, "landscape-rasters",
+                                          paste0("NLCD-", name, "-",NLCD_year, "-",
+                                                 basin$id, ".tif")), overwrite =TRUE)
+
+      metadata <- data.frame(name = paste0("NLCD-", name),
+                                   filename = paste0("NLCD-", name, "-",NLCD_year, "-", basin$id, ".tif"),
+                                   source = "FedData package in R; National Land Cover Database",
+                                   description = paste0("Landuse classified as ", x),
+                                   notes = paste0("Landcover was determined from data year ", NLCD_year))
+
+      return(metadata)
+    }
+    land_metadata <- pbapply::pblapply(covers$Class, save_landuse) %>% dplyr::bind_rows()
+    metadata <- rbind(metadata, land_metadata)
+
+  }
+
+  #get climate data
+  if(any(layers %in% c("temp", "precip"))){
+    message("getting annual climate data...")
+    prism::prism_set_dl_dir(tempdir())
+
+    if("precip" %in% layers){
+      prism::get_prism_normals("ppt", "4km", annual = TRUE, keepZip = FALSE)
+      precip <- terra::rast(file.path(tempdir(),"prism_ppt_us_25m_2020_avg_30y/prism_ppt_us_25m_2020_avg_30y.tif"))
+
+      precip <- terra::crop(precip, terra::vect(basin))
+
+      terra::writeRaster(precip, file.path(data_wd, "landscape-rasters",paste0("precip-", basin$id, ".tif")), overwrite =TRUE)
+      metadata <- rbind(metadata,
+                        data.frame(name = "precip",
+                                   filename = paste0("precip-", basin$id, ".tif"),
+                                   source = "prism package in R; PRISM climate data",
+                                   description = "30-year average precipitation (1991-2020) in mm",
+                                   notes = "~4 km resolution"))
+    }
+
+    if("temp" %in% layers){
+      prism::get_prism_normals("tmean", "4km", annual = TRUE, keepZip = FALSE)
+      prism::get_prism_normals("tmin", "4km", annual = TRUE, keepZip = FALSE)
+      prism::get_prism_normals("tmax", "4km", annual = TRUE, keepZip = FALSE)
+
+      tmean <- terra::rast(file.path(tempdir(),"prism_tmean_us_25m_2020_avg_30y/prism_tmean_us_25m_2020_avg_30y.tif"))
+      tmin <- terra::rast(file.path(tempdir(),"prism_tmin_us_25m_2020_avg_30y/prism_tmin_us_25m_2020_avg_30y.tif"))
+      tmax <- terra::rast(file.path(tempdir(),"prism_tmax_us_25m_2020_avg_30y/prism_tmax_us_25m_2020_avg_30y.tif"))
+
+      tmean <- terra::crop(tmean, terra::vect(basin))
+      tmin <- terra::crop(tmin, terra::vect(basin))
+      tmax <- terra::crop(tmax, terra::vect(basin))
+
+      terra::writeRaster(tmean, file.path(data_wd, "landscape-rasters",paste0("tmean-", basin$id, ".tif")), overwrite =TRUE)
+      terra::writeRaster(tmax, file.path(data_wd, "landscape-rasters",paste0("tmax-", basin$id, ".tif")), overwrite =TRUE)
+      terra::writeRaster(tmin, file.path(data_wd, "landscape-rasters",paste0("tmin-", basin$id, ".tif")), overwrite =TRUE)
+
+      metadata <- rbind(metadata,
+                        data.frame(name = c("tmean", "tmax", "tmin"),
+                                   filename = paste0(c("tmean", "tmax", "tmin"), "-", basin$id, ".tif"),
+                                   source = "prism package in R; PRISM climate data",
+                                   description = paste0("30-year ", c("average", "maximum", "minimum"), " temperature (1991-2020) in degrees C"),
+                                   notes = "~4 km resolution"))
+
+    }
+
+
+
+  }
+
+  #
 }
 
 #' Interpolate missing MTBS dNBR data
