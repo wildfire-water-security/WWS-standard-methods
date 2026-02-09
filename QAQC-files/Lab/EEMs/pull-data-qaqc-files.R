@@ -62,12 +62,6 @@ library(dplyr)
     mutate(sample_type="sblank")
   write.csv(metadata, file.path(output_dir, "merged-blk-metadata.csv"), row.names=FALSE)
 
-  #make mdl file for eemanalyzeR
-    create_mdl("QAQC-files/Lab/EEMs/long-term-standards/blanks",
-               recursive = TRUE, type="eem", iblank="_blank")
-
-    create_mdl("QAQC-files/Lab/EEMs/long-term-standards/blanks",
-               recursive = TRUE, type="abs", iblank="_blank")
 
 #do the same for the tea samples -----
   #pull files from Aqualog folder and put in raw data
@@ -125,9 +119,3 @@ library(dplyr)
 
   write.csv(metadata, file.path(output_dir, "merged-tea-metadata.csv"), row.names=FALSE)
 
-  #make std file for eemanalyzeR
-  create_std("QAQC-files/Lab/EEMs/long-term-standards/tea-standards", recursive = TRUE,
-             type="eem", iblank="_blank", abs_pattern="Abs")
-
-  create_std("QAQC-files/Lab/EEMs/long-term-standards/tea-standards", recursive = TRUE,
-             type="abs", abs_pattern="Abs")
