@@ -1,6 +1,10 @@
 #used to create and save MDL and check standard files to a user's computer for the
  #qaqc checks for eemanalyzeR (https://katiewampler.github.io/eemanalyzeR/)
 
+#DIRECTIONS:
+  # 1. ensure you are in the WWS-standard-methods project
+  # 2. run the following lines of code
+
 library(eemanalyzeR)
 
 #make mdl file for eemanalyzeR
