@@ -23,96 +23,113 @@ prep_streamstats <- function(site_csv, data_wd, study_code, huc_code, crs="EPSG:
             is.numeric(huc_code) | is.character(huc_code))
 
   #check directories and create ones for writing data to
-    data_wd <- normalizePath(data_wd)
-    dir.create(file.path(data_wd, paste0(study_code, "-sites")), recursive = TRUE, showWarnings = FALSE)
-    dir.create(file.path(data_wd, paste0(study_code, "-basins/check-plots")), recursive = TRUE, showWarnings = FALSE)
-    dir.create(file.path(data_wd, "streamstats-output"), recursive = TRUE, showWarnings = FALSE)
+  data_wd <- normalizePath(data_wd)
+  dir.create(file.path(data_wd, paste0(study_code, "-sites")), recursive = TRUE, showWarnings = FALSE)
+  dir.create(file.path(data_wd, paste0(study_code, "-basins/check-plots")), recursive = TRUE, showWarnings = FALSE)
+  dir.create(file.path(data_wd, "streamstats-output"), recursive = TRUE, showWarnings = FALSE)
 
   #read in .csv
-    if(!is.data.frame(site_csv)){
-      data <- read.csv(site_csv)
-    }
+  if(!is.data.frame(site_csv)){
+    data <- read.csv(site_csv)
+  }
 
-    #check .csv conforms
-    stopifnot(c("siteID","locality","latitude","longitude") %in% colnames(data))
+  #check .csv conforms
+  stopifnot(c("siteID","locality","latitude","longitude") %in% colnames(data))
 
   #turn sites into a gpkg and save
-    sites <- data %>% sf::st_as_sf(coords=c("longitude","latitude"), crs=crs)
-    sf::write_sf(sites, file.path(data_wd, paste0(study_code, "-sites"), paste0(study_code,"-sites.gpkg")))
+  sites <- data %>% sf::st_as_sf(coords=c("longitude","latitude"), crs=crs)
+  sf::write_sf(sites, file.path(data_wd, paste0(study_code, "-sites"), paste0(study_code,"-sites.gpkg")))
 
-    #also save one as _adj for editing
-    sf::write_sf(sites, file.path(data_wd, paste0(study_code, "-sites"),
-                                  paste0(study_code,"-sites_adj.gpkg")))
+  #also save one as _adj for editing
+  sf::write_sf(sites, file.path(data_wd, paste0(study_code, "-sites"),
+                                paste0(study_code,"-sites_adj.gpkg")))
 
   #get stream data
-    huc_code <- as.character(huc_code)
-    type <- stringr::str_pad(nchar(huc_code), 2, side="left", pad="0")
-    stopifnot(type %in% c("02", "04", "06", "08", "10", "12"))
+  huc_code <- as.character(huc_code)
+  type <- stringr::str_pad(nchar(huc_code), 2, side="left", pad="0")
+  stopifnot(type %in% c("02", "04", "06", "08", "10", "12"))
 
-    basin <- nhdplusTools::get_huc(id=huc_code, type=paste0("huc",type))
-    sf::write_sf(basin, file.path(data_wd, paste0(huc_code, "-basin.gpkg")))
+  basin <- nhdplusTools::get_huc(id=huc_code, type=paste0("huc",type))
+  sf::write_sf(basin, file.path(data_wd, paste0(huc_code, "-basin.gpkg")))
 
-    nhd_streams <- nhdplusTools::get_nhdplus(AOI = basin)
-    sf::write_sf(nhd_streams, file.path(data_wd, paste0(study_code, "-nhd-streams.gpkg")))
+  nhd_streams <- nhdplusTools::get_nhdplus(AOI = basin)
+  sf::write_sf(nhd_streams, file.path(data_wd, paste0(study_code, "-nhd-streams.gpkg")))
 
   #get the streamstats grid of streams, clip to basin before saving
-    state <- unique(basin$states)
-    state <- gsub("CN,|,CN", "", state)
-    if(nchar(state) > 2){stop("code currently not set up to handle more than one state, contact Katie Wampler to update")}
+  state <- unlist(strsplit(basin$states, ","))
+  state <- state[state != "CN"]
 
-    #download grid and save to temp
-    url <- paste0("https://streamstats.usgs.gov/streamgrids/", state, "/", state, ".zip")
-    if(!file.exists(file.path(tempdir(), paste0("streamgrid-", state, "/streamgrid.tif")))){
-      download.file(url = url, destfile = file.path(tempdir(), paste0("streamgrid-", state, ".zip")),
-                                                    mode = "wb") # 'wb' for binary
-      unzip(file.path(tempdir(), paste0("streamgrid-", state, ".zip")),
-            exdir = file.path(tempdir(), paste0("streamgrid-", state)))
+  #download grid and save to temp
+  for(x in state){
+    url <- paste0("https://streamstats.usgs.gov/streamgrids/", x, "/", x, ".zip")
+    if(!file.exists(file.path(tempdir(), paste0("streamgrid-", x, "/streamgrid.tif")))){
+      download.file(url = url, destfile = file.path(tempdir(), paste0("streamgrid-", x, ".zip")),
+                    mode = "wb") # 'wb' for binary
+      unzip(file.path(tempdir(), paste0("streamgrid-", x, ".zip")),
+            exdir = file.path(tempdir(), paste0("streamgrid-", x)))
     }
+  }
 
+  if(length(state) > 1){
+    paths <- file.path(tempdir(), paste0("streamgrid-", state, "/streamgrid.tif"))
+    stream_grid <- lapply(paths, function(x){
+      grid <- terra::rast(x)
+      basin <- terra::vect(basin)
+      basin_pj <- terra::project(basin, terra::crs(grid))
+      grid <- terra::crop(grid, basin_pj)
+      terra::coltab(grid) <- NULL #remove color table so we don't get warnings
+      return(grid)})
+
+    stream_grid <- do.call(terra::merge, stream_grid)
+    terra::writeRaster(stream_grid, file.path(data_wd, paste0(study_code, "-streamstats-grid.tif")), overwrite=TRUE)
+
+  }else{
     stream_grid <- terra::rast(file.path(tempdir(), paste0("streamgrid-", state, "/streamgrid.tif")))
     basin <- terra::vect(basin)
     basin_pj <- terra::project(basin, terra::crs(stream_grid))
     stream_grid <- terra::crop(stream_grid, basin_pj)
     terra::coltab(stream_grid) <- NULL #remove color table so we don't get warnings
     terra::writeRaster(stream_grid, file.path(data_wd, paste0(study_code, "-streamstats-grid.tif")), overwrite=TRUE)
+  }
 
   #snap points to the grid
-    if(file.exists(file.path(data_wd, paste0(study_code, "-sites"),
-                             paste0(study_code,"-sites_adj.gpkg")))){
-      sites <- sf::read_sf(file.path(data_wd, paste0(study_code, "-sites"),
-                                     paste0(study_code,"-sites_adj.gpkg")))
-    }
+  if(file.exists(file.path(data_wd, paste0(study_code, "-sites"),
+                           paste0(study_code,"-sites_adj.gpkg")))){
+    sites <- sf::read_sf(file.path(data_wd, paste0(study_code, "-sites"),
+                                   paste0(study_code,"-sites_adj.gpkg")))
+  }
 
-    #ensure same projections
-    sites_pj <- sf::st_transform(sites, terra::crs(stream_grid)) %>% dplyr::select(siteID)
+  #ensure same projections
+  sites_pj <- sf::st_transform(sites, terra::crs(stream_grid)) %>% dplyr::select(siteID)
 
-    #save layers to use with whitebox -> temp directory
-    sf::write_sf(sites_pj, file.path(tempdir(), "sites.shp"))
-    stream_grid <- terra::rast(file.path(data_wd, paste0(study_code, "-streamstats-grid.tif")))
-    terra::writeRaster(stream_grid, file.path(tempdir(), "streams_crop.tif"), overwrite=TRUE)
+  #save layers to use with whitebox -> temp directory
+  sf::write_sf(sites_pj, file.path(tempdir(), "sites.shp"))
+  stream_grid <- terra::rast(file.path(data_wd, paste0(study_code, "-streamstats-grid.tif")))
+  terra::writeRaster(stream_grid, file.path(tempdir(), "streams_crop.tif"), overwrite=TRUE)
 
-    # Extract the streams and snap the pour points to the streams
-    whitebox::wbt_init() # initiate whitebox tools
-    whitebox::wbt_jenson_snap_pour_points(pour_pts = "sites.shp",
-                                streams = "streams_crop.tif",
-                                output = paste0("snapped-", study_code,"-sites.shp"),
-                                snap_dist = snap_dist,
-                                wd = tempdir())
+  # Extract the streams and snap the pour points to the streams
+  whitebox::wbt_init() # initiate whitebox tools
+  whitebox::wbt_jenson_snap_pour_points(pour_pts = "sites.shp",
+                                        streams = "streams_crop.tif",
+                                        output = paste0("snapped-", study_code,"-sites.shp"),
+                                        snap_dist = snap_dist,
+                                        wd = tempdir())
 
-    #load points
-    snapped_points <- sf::read_sf(file.path(tempdir(), paste0("snapped-", study_code,"-sites.shp")))
+  #load points
+  snapped_points <- sf::read_sf(file.path(tempdir(), paste0("snapped-", study_code,"-sites.shp")))
 
-    #save snapped points to main folder to save for streamstats
-    sf::write_sf(snapped_points, file.path(data_wd, paste0(study_code, "-sites"),
-                                       paste0("snapped-", study_code,"-sites.gpkg")))
+  #save snapped points to main folder to save for streamstats
+  sf::write_sf(snapped_points, file.path(data_wd, paste0(study_code, "-sites"),
+                                         paste0("snapped-", study_code,"-sites.gpkg")))
 
-    message("site points have been prepared for StreamStats batch processing: \n",
-            normalizePath(file.path(data_wd, paste0(study_code, "-sites"))),
-            "\n\nPlease manually check *-sites_adj.gpkg and adjust points to ensure sites are on the correct flowline, then rerun.")
+  message("site points have been prepared for StreamStats batch processing: \n",
+          normalizePath(file.path(data_wd, paste0(study_code, "-sites"))),
+          "\n\nPlease manually check *-sites_adj.gpkg and adjust points to ensure sites are on the correct flowline, then rerun.")
 
-    return(snapped_points)
+  return(snapped_points)
 
 }
+
 
 #' Snap manually adjusted points to the streamgrid
 #'
@@ -354,7 +371,8 @@ validate_streamstats <- function(basins, data_wd, study_code){
 #' @examples
 calc_basin_metrics <- function(data, data_name, basins, calc){
   stopifnot(inherits(data, "SpatRaster") || file.exists(data),
-            inherits(basins, "sf") || dir.exists(basins), calc %in% c("mean", "min", "max", "sum", "isNA", "notNA", "percent", "mode"),
+            inherits(basins, "sf") || dir.exists(basins),
+            calc %in% c("mean", "min", "max", "sum", "isNA", "notNA", "percent", "mode"),
             is.character(data_name))
 
   #get data if only path is provided
@@ -415,11 +433,14 @@ calc_basin_metrics <- function(data, data_name, basins, calc){
 #' - `slope`: Slope in degrees; from `elevator` package.
 #' - `aspect`: Aspect classified into the 8 secondary intercardinal directions; from `elevator` package.
 #' - `temp`: Minimum, mean, and maximum 30-year normal temperature; from `prism` package.
+#' - `precip`: The mean 30-year normal precipitation; from `prism` package.
+#' - `landuse`: A raster of all the classifed landuses across the basin, and also rasters of
+#' individual landuses (specified as a 0/1) to calculate percentages of each landuse; from `FedData` package.
 #'
 #'
 #' @examples
 landscape_rasters <- function(data_wd, huc_code = NULL,
-                              layers = c("elev", "slope", "aspect", "temp", "precip", "landuse", "soils"),
+                              layers = c("elev", "slope", "aspect", "temp", "precip", "landuse"),
                               NLCD_year = 2019){
   stopifnot(dir.exists(data_wd), is.null(huc_code) | is.numeric(huc_code), all(is.character(layers)))
 
@@ -427,7 +448,8 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
   dir.create(file.path(data_wd, "landscape-rasters"), showWarnings = FALSE)
 
   #create df to store landscape metadata
-  metadata <- data.frame(name=character(), filename=character(),
+  metadata <- data.frame(name=character(), filename=character(), calc = character(),
+                         nicename = character(),
                          source=character(), description = character(), notes = character())
 
   #get overall basin
@@ -452,6 +474,8 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
       metadata <- rbind(metadata,
                         data.frame(name = "elev",
                                    filename = paste0("elev-", basin$id, ".tif"),
+                                   calc = "mean",
+                                   nicename = "elev_m",
                                    source = "elevatr package in R; OpenTopography API global dataset",
                                    description = "Elevation in meters",
                                    notes = "zoom level of 11, resulting in ~30m resolution"))
@@ -465,6 +489,8 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
       metadata <- rbind(metadata,
                         data.frame(name = "slope",
                                    filename = paste0("slope-", basin$id, ".tif"),
+                                   calc = "mean",
+                                   nicename = "slope_deg",
                                    source = "elevatr package in R; OpenTopography API global dataset",
                                    description = "Slope in degrees",
                                    notes = "zoom level of 11, resulting in ~30m resolution"))
@@ -487,11 +513,13 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
       aspect_reclass <- classify(aspect, rclmat, include.lowest=TRUE)
       levels(aspect_reclass) <- data.frame(id=1:9, aspect=c("N", "NE", "E", "SE",
                                                             "S", "SW", "W", "NW", "W"))
-      terra::writeRaster(aspect, file.path(data_wd, "landscape-rasters",paste0("aspect-", basin$id, ".tif")), overwrite =TRUE)
+      terra::writeRaster(aspect_reclass, file.path(data_wd, "landscape-rasters",paste0("aspect-", basin$id, ".tif")), overwrite =TRUE)
 
       metadata <- rbind(metadata,
                         data.frame(name = "aspect",
                                    filename = paste0("aspect-", basin$id, ".tif"),
+                                   calc = "mode",
+                                   nicename = "aspect",
                                    source = "elevatr package in R; OpenTopography API global dataset",
                                    description = "Aspect, classified into the 8 secondary intercardinal directions",
                                    notes = "zoom level of 11, resulting in ~30m resolution"))
@@ -505,33 +533,64 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
   if("landuse" %in% layers){
     message("getting landuse data...")
 
+    codes <- data.frame(
+      name = c(
+        "Open Water",
+        "Perennial Ice/Snow",
+        "Developed, Open Space",
+        "Developed, Low Intensity",
+        "Developed, Medium Intensity",
+        "Developed High Intensity",
+        "Barren Land (Rock/Sand/Clay)",
+        "Deciduous Forest",
+        "Evergreen Forest",
+        "Mixed Forest",
+        "Shrub/Scrub",
+        "Grassland/Herbaceous",
+        "Pasture/Hay",
+        "Cultivated Crops",
+        "Woody Wetlands",
+        "Emergent Herbaceous Wetlands"
+      ),
+      code= c(
+        "WATR", "ICE", "UROS", "URLD", "URMD", "URHD", "BARR",
+        "FRSD", "FRSE", "FRST", "RNGB", "RNGE",
+        "PAST", "AGRL", "WETL", "EHWL"
+      ))
+
     NLCD <- FedData::get_nlcd(basin, label=basin$id, year=NLCD_year)
 
     terra::writeRaster(NLCD, file.path(data_wd, "landscape-rasters",
                                         paste0("NLCD-",NLCD_year, "-",
                                                basin$id, ".tif")), overwrite =TRUE)
 
-    metadata <- data.frame(name = "NLCD",
+    metadata <- rbind(metadata, data.frame(name = "NLCD",
                            filename = paste0("NLCD-", NLCD_year, "-", basin$id, ".tif"),
+                           calc = "mode",
+                           nicename = "mj_landuse",
                            source = "FedData package in R; National Land Cover Database",
                            description = "Classified raster with the NLCD landuses",
-                           notes = paste0("Landcover was determined from data year ", NLCD_year))
+                           notes = paste0("Landcover was determined from data year ", NLCD_year)))
 
     #get raster of 1/0 for each landuse
     covers <- unique(NLCD)
 
     save_landuse <- function(x){
+      #convert to 0/1
       cover <- droplevels(NLCD, setdiff(covers$Class,x))
       cover <- as.numeric(cover)
       cover[is.na(cover)] <- 0
+      cover[cover > 0] <- 1
 
-      name <- abbreviate(gsub("[/]|[(]|[)]", " ", x), minlength=3)
+      name <- codes$code[codes$name == x]
       terra::writeRaster(cover, file.path(data_wd, "landscape-rasters",
                                           paste0("NLCD-", name, "-",NLCD_year, "-",
                                                  basin$id, ".tif")), overwrite =TRUE)
 
       metadata <- data.frame(name = paste0("NLCD-", name),
                                    filename = paste0("NLCD-", name, "-",NLCD_year, "-", basin$id, ".tif"),
+                                   calc = "percent",
+                                   nicename = paste0("per_", name),
                                    source = "FedData package in R; National Land Cover Database",
                                    description = paste0("Landuse classified as ", x),
                                    notes = paste0("Landcover was determined from data year ", NLCD_year))
@@ -558,6 +617,8 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
       metadata <- rbind(metadata,
                         data.frame(name = "precip",
                                    filename = paste0("precip-", basin$id, ".tif"),
+                                   calc = "mean",
+                                   nicename = "precip_mm",
                                    source = "prism package in R; PRISM climate data",
                                    description = "30-year average precipitation (1991-2020) in mm",
                                    notes = "~4 km resolution"))
@@ -583,6 +644,8 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
       metadata <- rbind(metadata,
                         data.frame(name = c("tmean", "tmax", "tmin"),
                                    filename = paste0(c("tmean", "tmax", "tmin"), "-", basin$id, ".tif"),
+                                   calc = "mean",
+                                   nicename = paste0(c("tmean", "tmax", "tmin"), "_degC"),
                                    source = "prism package in R; PRISM climate data",
                                    description = paste0("30-year ", c("average", "maximum", "minimum"), " temperature (1991-2020) in degrees C"),
                                    notes = "~4 km resolution"))
@@ -593,19 +656,77 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
 
   }
 
-  #get soil data
-  if("soils" %in% layers){
-    statsgo_mukey <- soilDB::mukey.wcs(basin, db="STATSGO")
-    message("getting soil data...")
-    soil <- FedData::get_ssurgo(basin, label = "landscape-char")
-    ssurgo.geom <- soilDB::SDA_spatialQuery(basin,
-                                    what = 'mukey',
-                                    db = 'SSURGO',
-                                    addFields = "awc_r")
+  #return metadata and write to file
+  write.csv(metadata, file.path(data_wd, "landscape-rasters", "landscape-char-metadata.csv"), quote=FALSE, row.names=FALSE)
+  return(metadata)
+}
 
 
+#' Calculate common landscape and climate metrics
+#'
+#' Downloads the data required to calculate a number of commonly desired landscape and climate metrics,
+#' and then summarizes the data across the provided basin upstream areas to get a summary value for each site.
+#'
+#' @param data_wd File path where you want all the spatial data saved (e.g., `data/spatial-data`).
+#' @param basins An object of class `sf` containing the streamstats basins, likely an output from `get_streamstats` or the file path to
+#' a directory with the basin files saved as `shp` or `gpkg` files.
+#' @param huc_code HUC number for the basin encompassing all your sites, this is used for grabbing stream data.
+#' @param layers The datasets to download, see details for detailed information about the layer options.
+#' @param NLCD_year An integer representing the year of desired NLCD product. Acceptable values are 2021, 2019 (default), 2016, 2011, 2008, 2006, 2004, and 2001.
+#'
+#' @returns a `data.frame` containing the upstream area summarized values for each site.
+#'
+#' @details
+#' Available options for `layers` include:
+#' - `elev`: Elevation in meters; from `elevator` package.
+#' - `slope`: Slope in degrees; from `elevator` package.
+#' - `aspect`: Aspect classified into the 8 secondary intercardinal directions; from `elevator` package.
+#' - `temp`: Minimum, mean, and maximum 30-year normal temperature; from `prism` package.
+#' - `precip`: The mean 30-year normal precipitation; from `prism` package.
+#' - `landuse`: A raster of all the classifed landuses across the basin, and also rasters of
+#' individual landuses (specified as a 0/1) to calculate percentages of each landuse; from `FedData` package.
+#'
+#' For details about each layer, see layer metadata: `file.path(data_wd, "landscape-rasters", "landscape-char-metadata.csv")`
+#'
+#' @export
+#' @md
+#'
+#' @examples
+get_basic_metrics <- function(data_wd, basins, huc_code,
+                              layers = c("elev", "slope", "aspect", "temp", "precip", "landuse"),
+                              NLCD_year = 2019){
+  stopifnot(dir.exists(data_wd), is.numeric(huc_code), all(is.character(layers)),
+            inherits(basins, "sf") || dir.exists(basins))
 
-  }
+  if(!inherits(basins, "sf")){
+    files <- list.files(basins, pattern ="[.]shp|[.]gpkg", full.names = TRUE)
+    basins <- lapply(files, sf::read_sf) %>% dplyr::bind_rows()}
+
+  #get data to calculate metrics
+  metrics <- landscape_rasters(data_wd = data_wd, huc_code=huc_code,
+                    NLCD_year = NLCD_year)
+
+  #get metrics
+  message("calculating basin summarized values...")
+    #get area
+    area <- data.frame(siteID = basins$siteID, area_km2 = as.numeric(sf::st_area(basins)) * 1*10^-6) #km2
+
+    calcs <- lapply(1:nrow(metrics), function(x){
+      message(paste("calculating", metrics$nicename[x], "..."))
+
+      filename <- metrics$filename[x]
+
+      layer <- terra::rast(file.path(data_wd, "landscape-rasters", filename))
+      calc <- calc_basin_metrics(layer, metrics$nicename[x], basins, calc=metrics$calc[x])
+
+      return(calc)
+    })
+
+    calcs <- Reduce(function(...) merge(..., by='siteID', all.x=TRUE), calcs)
+
+    calcs <- area %>% dplyr::left_join(calcs, by = join_by(siteID))
+
+  return(calcs)
 }
 
 #' Interpolate missing MTBS dNBR data
