@@ -57,7 +57,8 @@ prep_streamstats <- function(site_csv, data_wd, study_code, huc_code, crs="EPSG:
 
   #get the streamstats grid of streams, clip to basin before saving
     state <- unique(basin$states)
-    if(length(state) > 1){stop("code currently not set up to handle more than one state, contact Katie Wampler to update")}
+    state <- gsub("CN,|,CN", "", state)
+    if(nchar(state) > 2){stop("code currently not set up to handle more than one state, contact Katie Wampler to update")}
 
     #download grid and save to temp
     url <- paste0("https://streamstats.usgs.gov/streamgrids/", state, "/", state, ".zip")
@@ -418,7 +419,7 @@ calc_basin_metrics <- function(data, data_name, basins, calc){
 #'
 #' @examples
 landscape_rasters <- function(data_wd, huc_code = NULL,
-                              layers = c("elev", "slope", "aspect", "temp", "precip", "landuse"),
+                              layers = c("elev", "slope", "aspect", "temp", "precip", "landuse", "soils"),
                               NLCD_year = 2019){
   stopifnot(dir.exists(data_wd), is.null(huc_code) | is.numeric(huc_code), all(is.character(layers)))
 
@@ -506,6 +507,16 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
 
     NLCD <- FedData::get_nlcd(basin, label=basin$id, year=NLCD_year)
 
+    terra::writeRaster(NLCD, file.path(data_wd, "landscape-rasters",
+                                        paste0("NLCD-",NLCD_year, "-",
+                                               basin$id, ".tif")), overwrite =TRUE)
+
+    metadata <- data.frame(name = "NLCD",
+                           filename = paste0("NLCD-", NLCD_year, "-", basin$id, ".tif"),
+                           source = "FedData package in R; National Land Cover Database",
+                           description = "Classified raster with the NLCD landuses",
+                           notes = paste0("Landcover was determined from data year ", NLCD_year))
+
     #get raster of 1/0 for each landuse
     covers <- unique(NLCD)
 
@@ -582,7 +593,19 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
 
   }
 
-  #
+  #get soil data
+  if("soils" %in% layers){
+    statsgo_mukey <- soilDB::mukey.wcs(basin, db="STATSGO")
+    message("getting soil data...")
+    soil <- FedData::get_ssurgo(basin, label = "landscape-char")
+    ssurgo.geom <- soilDB::SDA_spatialQuery(basin,
+                                    what = 'mukey',
+                                    db = 'SSURGO',
+                                    addFields = "awc_r")
+
+
+
+  }
 }
 
 #' Interpolate missing MTBS dNBR data
