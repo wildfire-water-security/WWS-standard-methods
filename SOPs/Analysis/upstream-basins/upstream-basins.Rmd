@@ -174,69 +174,24 @@ plot(sf::read_sf(here::here("SOPs/Analysis/upstream-basins/example-data/example-
 
 # Step 3: Get Landscape Characteristics
 
-Once the basins associated with each site have been downloaded and checked you can use these to calculate basin-wide metrics.
-
-Let's use elevation as an example we can download elevation data via the `elevator` package.
+Once the basins associated with each site have been downloaded and checked you can use these to calculate basin-wide metrics. To automatically get a selection of commonly used metrics (area, elevation, slope, aspect, landuse, precipitation, temperature), you can use the `get_basic_metrics` function. This can take some time so for this example we'll just get elevation. To get information about the metrics, see `file.path(data_wd, "landscape-rasters", "landscape-char-metadata.csv")` for information about the scale and source of the datasets used.
 
 ```{r}
-basin <- sf::read_sf(file.path(data_wd, paste0(huc_code, "-basin.gpkg")))
-elev <- elevatr::get_elev_raster(basin, z=8, prj = terra::crs(basin))
-elev <- terra::rast(elev) #convert from old raster format to new terra format
+get_basic_metrics(data_wd, basins, huc_code, layers="elev")
 ```
 
-Now we'll use the `calc_basin_metrics` function to get the average elevation across each upstream area. The function takes four arguments:
+If you have a different raster you want to use, you can do that manually using the `calc_basin_metrics` function to get the average elevation across each upstream area. The function takes four arguments:
 
 -   `data` Either a file path to a raster (`.tif`, `.tiff`, or `.aig`) or a `spatRaster` object.
 -   `data_name` A character description of the data layer, used as the column name for the output `data.frame`.
 -   `basins` An object of class `sf` containing the StreamStats basins, likely an output from `get_streamstats` or the file path to a directory with the basin files saved as `.shp` or `.gpkg` files.
 -   `calc` Function used to summarise the `data` layer, options include: mean, min, max, sum, isNA, notNA, percent.
 
+Since we already have the dataset downloaded, we'll use elevation again.
+
 ```{r}
+elev <- terra::rast(file.path(data_wd, "landscape-rasters", paste0("elev-", huc_code, ".tif")))
 avg_elev <- calc_basin_metrics(elev, "elevation_m", basins, calc="mean")
 
 avg_elev
 ```
-
-This function can be used for a wide variety of raster layers some potential suggested ones along with the best way to download the data would be:
-
--   elevation and slope (`elevator`)
-
-    ```{r}
-    basin <- sf::read_sf(file.path(data_wd, paste0(huc_code, "-basin.gpkg")))
-    elev <- elevatr::get_elev_raster(basin, z=8, prj = terra::crs(basin))
-    elev <- terra::rast(elev)
-    terra::plot(elev)
-    slope <- terra::terrain(elev, v="slope")
-    terra::plot(slope)
-    ```
-
--   air temperature, precipitation (`prism`)
-
-    ```{r}
-    prism::prism_set_dl_dir(tempdir())
-
-    # Download the 30-year annual average precip and annual average temperature
-    prism::get_prism_normals("ppt", "4km", annual = TRUE, keepZip = FALSE)
-    prism::get_prism_normals("tmean", "4km", annual = TRUE, keepZip = FALSE)
-
-    precip <- terra::rast(file.path(tempdir(),"prism_ppt_us_25m_2020_avg_30y/prism_ppt_us_25m_2020_avg_30y.tif"))
-    terra::plot(precip)
-
-    tmean <- terra::rast(file.path(tempdir(),"prism_tmean_us_25m_2020_avg_30y/prism_tmean_us_25m_2020_avg_30y.tif"))
-    terra::plot(tmean)
-    ```
-
--   land cover (`FedData`)
-
-    ```{r}
-    NLCD <- FedData::get_nlcd(basin, label=study_code, year=2019)
-    terra::plot(NLCD)
-    major_land_class <- calc_basin_metrics(NLCD, "landuse", basins, calc="mode")
-    ```
-
--   soil characteristics (`SoilDB`), specified by the STATSGO mukey.
-
-    ```{r}
-    statsgo_mukey <- soilDB::mukey.wcs(basin, db="STATSGO")
-    terra::plot(statsgo_mukey)
-    ```
