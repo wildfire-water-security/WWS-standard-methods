@@ -478,7 +478,7 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
                                    nicename = "elev_m",
                                    source = "elevatr package in R; OpenTopography API global dataset",
                                    description = "Elevation in meters",
-                                   notes = "zoom level of 11, resulting in ~30m resolution"))
+                                   notes = "zoom level of 11; resulting in ~30m resolution"))
 
     }
 
