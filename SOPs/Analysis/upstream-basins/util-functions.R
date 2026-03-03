@@ -356,7 +356,9 @@ validate_streamstats <- function(basins, data_wd, study_code){
 #' @param basins An object of class `sf` containing the streamstats basins, likely an output from `get_streamstats` or the file path to
 #' a directory with the basin files saved as `shp` or `gpkg` files.
 #' @param calc Function used to summarise the `data` layer, options include: mean, min, max, sum, isNA, notNA, percent, mode.
-#'
+#' @param type Either `basin` or `buffer` where `basin` calculates the average across the upstream basin area and `buffer` calculates the
+#' average across a buffer around the stream network. The distance is specified in `buff`.
+#' @param buff The width around the stream network in meter to buffer.
 #' @returns A `data.frame` with rows equal to the number of basins in `basins` and two columns: the siteID and the `data_name` with the
 #' calculated value.
 #'
@@ -369,11 +371,12 @@ validate_streamstats <- function(basins, data_wd, study_code){
 #'
 #'
 #' @examples
-calc_basin_metrics <- function(data, data_name, basins, calc){
+calc_basin_metrics <- function(data, data_name, basins, calc, type="basin", buff=100){
   stopifnot(inherits(data, "SpatRaster") || file.exists(data),
             inherits(basins, "sf") || dir.exists(basins),
             calc %in% c("mean", "min", "max", "sum", "isNA", "notNA", "percent", "mode"),
-            is.character(data_name))
+            is.character(data_name), type %in% c("basin", "buffer"),
+            is.numeric(buff))
 
   #get data if only path is provided
   if(!inherits(data, "SpatRaster") & !inherits(data, "sf") & tools::file_ext(data) %in% c("tif", "tiff", "AIG")){data <- terra::rast(data)}
@@ -387,7 +390,14 @@ calc_basin_metrics <- function(data, data_name, basins, calc){
 
   #get stats for each basin
   basin_vals <- pbapply::pbsapply(seq_len(nrow(basins)), function(x) {
-    basin <- terra::vect(basins[x, ])
+    basin <- basins[x, ]
+    if(type == "buffer"){
+      streams <- nhdplusTools::get_nhdplus(basin, t_srs = crs(data))
+      sf_use_s2(TRUE) #maintains buffer in m
+      basin <- sf::st_union(sf::st_buffer(streams, dist=buff))
+    }
+
+    basin <- terra::vect(basin)
     data_crop <- terra::crop(data, basins[x,])
 
     if(calc == "percent"){
@@ -399,7 +409,7 @@ calc_basin_metrics <- function(data, data_name, basins, calc){
       val <- terra::extract(data_crop, basin, fun = table)
       val <- colnames(val)[which.max(val[1,])]
 
-      }else{
+    }else{
       val <- as.numeric(unname(terra::zonal(data_crop, basin, fun = calc)))
     }
 
@@ -593,6 +603,7 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
     covers <- unique(NLCD)
 
     save_landuse <- function(x){
+      name <- codes$code[codes$name == x]
       filename <- file.path(data_wd, "landscape-rasters",
                             paste0("NLCD-", name, "-",NLCD_year, "-",basin$id, ".tif"))
 
@@ -603,7 +614,6 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
         cover[is.na(cover)] <- 0
         cover[cover > 0] <- 1
 
-        name <- codes$code[codes$name == x]
         terra::writeRaster(cover, filename, overwrite =TRUE)
       }
 
