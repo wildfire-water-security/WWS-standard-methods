@@ -23,7 +23,8 @@ Within the existing file structure, create a new folder for each unique data typ
   - *Modeling*: Associated with modeling analyses
 
 **Templates: Any standardized templates associated with the above processes**
-  - If a template is method specific store it in the appropriate SOPs folder. This folder is for more generate templates than span multiple methods.
+  - If a template is method specific store it in the appropriate SOPs folder.
+  - This folder is for more generate templates than span multiple methods.
     
 Steps:
 1. Navigate to the appropriate folder (e.g., `SOPs/Lab` or `QAQC-files/Field`).
