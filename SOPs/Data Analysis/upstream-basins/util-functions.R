@@ -398,7 +398,7 @@ calc_basin_metrics <- function(data, data_name, basins, calc, type="basin", buff
     }
 
     basin <- terra::vect(basin)
-    data_crop <- terra::crop(data, basins[x,])
+    data_crop <- terra::crop(data, basin, mask=TRUE)
 
     if(calc == "percent"){
       val_sum <- as.numeric(unname(terra::zonal(data_crop, basin, fun = "sum")))
