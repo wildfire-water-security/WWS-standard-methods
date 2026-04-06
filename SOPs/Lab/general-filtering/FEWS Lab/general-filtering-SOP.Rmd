@@ -207,7 +207,7 @@ library(kableExtra)
 > **`r kableExtra::text_spec("Important:", color = "red")` Frozen sample bottles will expand or break if overfilled!**
 
 | Analysis | Bottle Type | How Much Sample | Storage |
-|----|----|----|----|
+|-------------------|------------------|-------------------|------------------|
 | Aqualog (DOM) | 30 mL or 125 mL | \~30 mL | Fridge |
 | Shimadzu (TOC/TN) | 125 mL | \~80 mL (1 cm below neck). DO NOT OVERFILL. | Freezer |
 | Levoglucosan | 20 mL (glass) | \~10 mL (1/2 full). DO NOT OVERFILL. | Freezer |
@@ -219,6 +219,6 @@ library(kableExtra)
 > **`r kableExtra::text_spec("Important:", color = "red")` Check with project lead before dumping any sample!**
 
 | Analysis | Bottle Type | What to Do when Analysis is `r kableExtra::text_spec("Complete", color = "red")` |
-|----|----|----|
+|------------------|------------------|-------------------------------------|
 | Aqualog (DOM) | 30 mL or 125 mL | Dump once it's been confirmed there aren't any reruns. |
 | Shimadzu (TOC/TN) | 125 mL |  |
