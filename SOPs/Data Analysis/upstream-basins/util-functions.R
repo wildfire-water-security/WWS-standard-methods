@@ -410,7 +410,7 @@ calc_basin_metrics <- function(data, data_name, basins, calc, type="basin", buff
       val <- val_sum / val_bsn #calculate the percentage
     }else if(calc == "mode"){
       val <- terra::extract(data_crop, basin, fun = table)
-      val <- colnames(val)[which.max(val[1,])]
+      val <- val[which.max(val$count),2]
 
     }else{
       val <- as.numeric(unname(terra::zonal(data_crop, basin, fun = calc)))
