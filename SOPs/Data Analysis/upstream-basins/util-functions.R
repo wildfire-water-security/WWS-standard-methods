@@ -612,10 +612,8 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
 
       if(!file.exists(filename)){
         #convert to 0/1
-        cover <- droplevels(NLCD, setdiff(covers$Class,x))
+        cover <- NLCD == x
         cover <- as.numeric(cover)
-        cover[is.na(cover)] <- 0
-        cover[cover > 0] <- 1
 
         terra::writeRaster(cover, filename, overwrite =TRUE)
       }
