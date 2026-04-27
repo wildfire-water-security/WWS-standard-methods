@@ -614,6 +614,7 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
         #convert to 0/1
         cover <- NLCD == x
         cover <- as.numeric(cover)
+        cover[is.na(cover)] <- 0 #replace NA with 0 so we don't get Nan
 
         terra::writeRaster(cover, filename, overwrite =TRUE)
       }
