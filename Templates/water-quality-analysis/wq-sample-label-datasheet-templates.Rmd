@@ -1,0 +1,118 @@
+---
+title: "wq-sample-label-datasheet-templates"
+output:
+  pdf_document: default
+  header-includes:
+    - \usepackage{pdflscape}
+    - \newcommand{\blandscape}{\begin{landscape}}
+    - \newcommand{\elandscape}{\end{landscape}}
+---
+
+# Summary
+
+The purpose of this R markdown is to ...
+
+Some packages that might be of use:
+
+```{r}
+library(dplyr)
+library(stringr)
+library(kableExtra)
+```
+
+The dplyr package is specifically designed to do data manipulation in a way that's relatively easy to read using things called pipes (`%>%`). See the chapter in this textbook [here](https://r4ds.hadley.nz/data-transform.html) for some examples of using `dplyr`.
+
+# 1. User Inputs
+
+**Put info from excel FILLME here as variables. Since we updated the methods we'll probably need to add:**
+
+-   `random_start` for the starting random number
+
+-   `samp_type` (GB,IS, SS, etc.)
+
+Variable names should be lowercase with no spaces (use underscores instead) and not too long (abbreviate where it makes sense).
+
+```{r}
+project <- "WWS" #the large project code
+study <- "TEST" #the study code 
+```
+
+# 2. Bottle Calculator
+
+Based on number of sites and samples per site, calculate bottle types needed as data.frame, then we can print nicely.
+
+```{r}
+
+```
+
+# 3. Label IDs
+
+We'll use this to generate sample IDs and random IDs for labels. For a start just use R functions to take the info from 1 and convert to the IDs. I think you have the most updated things we need but I think we need:
+
+-   **SampleID:** project_site_type_date_time
+
+-   **RandomID:** project_r###
+
+-   **ISCOID:** just the number order it goes in the isco?
+
+```{r}
+#paste function works well to join things together 
+paste0("A", "B", "C")
+
+paste("A", "B", "C")
+
+paste("A", "B", "C", sep="_")
+
+#the seq function is good for generating a sequence 
+seq(1,4)
+
+seq(as.Date("2023-02-01"), as.Date("2024-01-03"), by="month")
+
+#we can store all this in a data.frame similar to excel 
+data <- data.frame(project = project, 
+                   study=study, 
+                   dates = seq(as.Date("2023-02-01"), 
+                               as.Date("2024-01-03"), by="month"))
+
+data
+```
+
+# 4. Specifying analyte
+
+We might need to do some experimenting here. For a set of ISCO samples or a small number of grab samples I think we could just let the user specify the analytes they plan to run (i.e., `analyte <- c("DOC", "DOM")`). If we want to get fancier and let people run only a subset of samples for something we'll need to get fancier. But for now maybe we just allow all or nothing.
+
+# 5. Generating the .csv for labels
+
+We'll want to write the labels we need to a .csv file so we can use it for making labels. We'll want to just pull the columns we want.
+
+```{r}
+print_data <- data %>% select(project, study)
+print_data
+#write.csv(print_data, "filename.csv", row.names=FALSE)
+```
+
+# 6. Making the tables
+
+This part will be a little more complicated, since we want specific formatting. I think if we use the LaTeX command below (which is what the Rmarkdown uses to convert to PDF), it should start a new page that we can format how we like. I'm new to this part too, so we could do some research together when you get here.
+
+\\newpage
+
+\blandscape
+
+Date: \_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Technician: \_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Project Code: \_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Study Code: \_\_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+```{r echo=FALSE}
+kable(data, booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), 
+                full_width = FALSE, 
+                font_size = 10) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#D7261E")
+```
+
+\elandscape
