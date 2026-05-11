@@ -19,23 +19,25 @@ sites <- c("STA","COA") #site 1, 2
 sitelist <- rep(sites, times = sps)
 sitelist
 #
-#Not vector- can't get the code below to work with a vector
-sn <- 24 #total sample amount
-samples1 <- 12
-samples2 <-12
+#Not vector- can't get the code below to work with a vector. Don't like these
+sn <- 24 #total sample amount. Is there a way to use the sps to print this???
+samples1 <- 12 #samples for site 1
+samples2 <-12 #samples for site 2
 site1 <- "STA"
 site2 <- "COA"
-#time starts
-timestart1 <- as.POSIXct("2023-01-01 02:00:00") #start time of site 1
-timestart2 <- as.POSIXct("2023-01-01 23:00:00") #start time of site 2
+#time starts how to do vector????
+timestart1 <- as.POSIXct("2026-02-23 15:00:00") #start time of site 1
+timestart2 <- as.POSIXct("2026-02-23 17:00:00") #start time of site 2
 
-###how to do vector????
-times <- c(timestart1,timestart2)
-print(times)
-
-#works with one site at a time I guess- how to do for loop???
+#works with one site at a time I guess- how to do for loop?? 
+#would like to use the "sps" and "sites" here
 date1 <- seq(timestart1, by = "2 hours", length = samples1)
 date1
+date2 <- seq(timestart2, by = "2 hours", length = samples2)
+date2
+timecombined <- c(date1,date2)
+timecombined
+sitetime <- data.frame (time=timecombined,sites=sitelist)
 
 
 #########analysis##################
@@ -46,7 +48,7 @@ EXCESS <- "TRUE"
 Levoglucosan <- "TRUE"
 analyte <- c("DOC", "DOM", "CCAL", "LEVO", "EXCESS") #analysis
 
-#how to make it less messy??? 
+#how to make it less messy??? this is awful 
 analysiscodes <- c()
 if(DOC == "TRUE") {analysiscodes <- append(analysiscodes,"CN")}
 if(DOM == "TRUE") {analysiscodes <- append(analysiscodes,"AQ")}
@@ -64,11 +66,16 @@ analysis
 #putting it together- breaks if there is a false :/      
 lab <- data.frame(analysis=analysis,analysiscodes = analysiscodes)
 lab
+#how to make it repeat all analysis for each sample?
 lablabels <- rep(lab, times = sps)
+#need a way to have ex. AQ added to end of ID and Aqualog added in another row
+
+
 
 
 #####Random IDs ##########
-#random ID number starting and sample numbers
+#random ID number starting and sample numbers. W
+#would like the sn to autofill itself somehow.
 randomID <- sample(rn:sn,sn, replace=F)
 print(randomID)
 #add leading zeros using sprintf
@@ -76,7 +83,7 @@ randomn <- sprintf("%04d", randomID)
 print(randomn)
 #Random IDs
 randomlabel <- paste0( study, "_", "R", randomn )
-print(randomlabel)
+randomlabel
 
 
 ######### If statements for sample type and analysis??? ###########
@@ -123,7 +130,7 @@ data
 
 
 
-
+#can't get the pipe function to work yet 
 print_data <- data %>% select(project, study)
 print_data
 #write.csv(print_data, "filename.csv", row.names=FALSE)
