@@ -6,12 +6,12 @@ library(lubridate)
 
 ######### Filling in codes##########
 project <- "WWS" #the large project code
-study <- "SSEMG" #the study code 
+study <- "SSEMG" #the study code
 samp_type <- "IS" #(GB,IS, SS, etc.)
-rn <- 1 #the stat of a random number sequence 
+rn <- 1 #the stat of a random number sequence
 site <- c("STA","COA")
 nsamp <- c(12,12) #amount of samples per site
-start <- c("2026-02-23 15:00","2026-02-23 17:00") 
+start <- c("2026-02-23 15:00","2026-02-23 17:00")
 interval <- c(2,2)
 
 ####analysis#####
@@ -30,15 +30,15 @@ site_label <- function(sampleinfo){
   timestart <- as.POSIXct(sampleinfo$start)
   timelist <- seq(timestart, by=paste0(sampleinfo$interval, " hours"), length = sampleinfo$nsamp)
   botnum <- rep(1:24, times= ceiling(sampleinfo$nsamp/24))[1:sampleinfo$nsamp] #added interval so if we ever want to change it, it's flexible
-  
+
   return(data.frame(site =sitelist, time=timelist, botnum = botnum, study=sampleinfo$study,samp_type=sampleinfo$samp_type)) #could include other label things in here too
-} 
+}
 
 #make data table and add random numbers to it. Re-running will change the random numbers
 data <- lapply(1:nrow(sampleinfo),function(x){site_label(sampleinfo[x,])})%>%
   bind_rows() %>%
   mutate (randomn= sample(rn:sn,sn, replace=F))
-        
+
 data
 
 #add sample names and IDs
@@ -52,18 +52,21 @@ datalabels
 fielddata <- datalabels #just re-naming it for clarity later
 
 #add analytes that are TRUE
-analysiscodes <- c() 
-if(DOC) {analysiscodes <- append(analysiscodes,"CN")} 
-if(DOM) {analysiscodes <- append(analysiscodes,"AQ")} 
-if(CCAL) {analysiscodes <- append(analysiscodes,"NU")} 
-if(Excess) {analysiscodes <- append(analysiscodes,"EX")} 
-if(Levoglucosan) {analysiscodes <- append(analysiscodes,"LV")} 
+analysis_opt <- c("CN", "AQ", "NU", "EX", "LV")
+analysis_choice <- c(DOC, DOM, CCAL, Excess, Levoglucosan)
+
+analysiscodes <- analysis_opt[analysis_choice]
+# if(DOC) {analysiscodes <- append(analysiscodes,"CN")}
+# if(DOM) {analysiscodes <- append(analysiscodes,"AQ")}
+# if(CCAL) {analysiscodes <- append(analysiscodes,"NU")}
+# if(Excess) {analysiscodes <- append(analysiscodes,"EX")}
+# if(Levoglucosan) {analysiscodes <- append(analysiscodes,"LV")}
 analysiscodes
 
 analysisn <- length(analysiscodes) #how many analytes there are
 samples <- analysisn*sn #how many total filtered samples
 
-datacodes<- data.frame(code = rep(analysiscodes,times=sn)) %>% #add labcodes 
+datacodes<- data.frame(code = rep(analysiscodes,times=sn)) %>% #add labcodes
   mutate(analysis = case_when(
     code == "CN" ~ "Shimadzu",
     code == "AQ" ~ "Aqualog",
@@ -74,11 +77,11 @@ datacodes<- data.frame(code = rep(analysiscodes,times=sn)) %>% #add labcodes
   ))
 datacodes
 #repeat samples for each analysis
-labdata <- datalabels %>% slice(rep(1:n(), each = analysisn)) %>% 
+labdata <- datalabels %>% slice(rep(1:n(), each = analysisn)) %>%
 mutate(datacodes,
        lab_sample_ID =
         paste0(field_sample_ID, "_", datacodes$code ))
-        
+
 print(labdata)
 
 #printing
