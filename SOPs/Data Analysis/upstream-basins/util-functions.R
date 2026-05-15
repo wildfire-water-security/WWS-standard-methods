@@ -41,7 +41,7 @@ prep_streamstats <- function(site_csv, data_wd, study_code, huc_code, crs="EPSG:
   sf::write_sf(sites, file.path(data_wd, paste0(study_code, "-sites"), paste0(study_code,"-sites.gpkg")))
 
   #also save one as _adj for editing
-  if(overwrite){
+  if(rewrite){
     sf::write_sf(sites, file.path(data_wd, paste0(study_code, "-sites"),
                                   paste0(study_code,"-sites_adj.gpkg")))
   }
