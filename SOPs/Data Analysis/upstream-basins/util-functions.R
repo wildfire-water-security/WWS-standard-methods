@@ -26,7 +26,6 @@ prep_streamstats <- function(site_csv, data_wd, study_code, huc_code, crs="EPSG:
   data_wd <- normalizePath(data_wd)
   dir.create(file.path(data_wd, paste0(study_code, "-sites")), recursive = TRUE, showWarnings = FALSE)
   dir.create(file.path(data_wd, paste0(study_code, "-basins/check-plots")), recursive = TRUE, showWarnings = FALSE)
-  dir.create(file.path(data_wd, "streamstats-output"), recursive = TRUE, showWarnings = FALSE)
 
   #read in .csv
   if(!is.data.frame(site_csv)){
@@ -48,6 +47,8 @@ prep_streamstats <- function(site_csv, data_wd, study_code, huc_code, crs="EPSG:
 
 
   #get stream data
+  message("downloading NHD streams...")
+
   huc_code <- as.character(huc_code)
   type <- stringr::str_pad(nchar(huc_code), 2, side="left", pad="0")
   stopifnot(type %in% c("02", "04", "06", "08", "10", "12"))
@@ -63,6 +64,7 @@ prep_streamstats <- function(site_csv, data_wd, study_code, huc_code, crs="EPSG:
   state <- state[state != "CN"]
 
   #download grid and save to temp
+  message("downloading streamstats grids...")
   for(x in state){
     url <- paste0("https://streamstats.usgs.gov/streamgrids/", x, "/", x, ".zip")
     if(!file.exists(file.path(tempdir(), paste0("streamgrid-", x, "/streamgrid.tif")))){
