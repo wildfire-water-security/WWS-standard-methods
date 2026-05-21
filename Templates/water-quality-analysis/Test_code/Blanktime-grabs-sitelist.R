@@ -57,7 +57,7 @@ blanklabels <- datablank %>%
                                         site, "_",
                                         samp_type,"_",
                                         blank_time), #adds blank sample ID
-         date_text = rep(NA, nrow(datablank)), time_text = rep(NA, nrow(datablank))) #adds column names to fill out
+         date_text = rep(NA, nrow(datablank)), time_text = rep(NA, nrow(datablank))) #adds column names to fill out. Puts NAs in them though
 blanklabels
 #print blank labels 
 write.csv(blanklabels, paste0("alldata_blank",fileformat), row.names=FALSE)

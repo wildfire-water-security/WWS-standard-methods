@@ -4,6 +4,8 @@ library(kableExtra)
 library(lubridate)
 
 
+
+
 ######### Fill out##########
 project <- "WWS" #the large project code
 study <- "SSEMG" #the study code
@@ -95,8 +97,9 @@ labdata <- datalabels %>% slice(rep(1:n(), each = analysisn)) %>%
 mutate(datacodes,
        lab_sample_ID =
         paste0(field_sample_ID, "_", datacodes$code ))
-
 print(labdata)
+
+
 #print csv for lab sample labels
 write.csv(labdata %>% select(lab_sample_ID,sample_name,analysis), 
           paste0(lab_file,fileformat), row.names=FALSE) 
