@@ -2,6 +2,16 @@ library(dplyr)
 library(stringr)
 library(kableExtra)
 library(lubridate)
+library(writexl)
+# Function to safely write csvs without overwriting anything
+safe.write_xlsx <- function(x, path, ...) {
+  if(file.exists(path)) {
+    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
+         "We don't want to overwrite randomized sample names\n",
+         "Check ", path, " to see if the already written file is ok.")
+  }
+  write_xlsx(x, path, ...)
+}
 
 
 
@@ -12,10 +22,10 @@ study <- "SSEMG" #the study code
 samp_type <- "IS" #(GB,IS, SS, etc.)
 rn <- 1 #the stat of a random number sequence
 site <- c("STA","COA")
-nsamp <- c(12,12) #amount of samples per site
+nsamp <- c(24,24) #amount of samples per site
 start <- c("2026-02-23 15:00","2026-02-23 17:00")
-interval <- c(2,2)
-sc <- "20260223" #what sample campaign this is
+interval <- c(2,2) #2 hrs
+sc <- "20260224" #what sample campaign this is
 #how to print off just the date???????
 #timestart<- as.charcter(start,[1)
 #timestart
@@ -32,7 +42,7 @@ field_file <-  "fieldsamples" #what to call header for field label file
 lab_file <-  "labsamples" #what to call header for lab label file
 #what format the files will end with. ex this returns:
 #header_study_sapmpletype_date 
-fileformat <- paste0("_",study,"_",samp_type,"_",sc,".csv") 
+fileformat <- paste0(study,"_",samp_type,"_",sc,"_label-table.xlsx") 
 fileformat
 
 
@@ -57,6 +67,7 @@ data <- lapply(1:nrow(sampleinfo),function(x){site_label(sampleinfo[x,])})%>%
 
 data
 
+
 #add sample names and IDs
 datalabels<-data %>%
   mutate(sample_name=paste0( study, "_", "R", sprintf("%04d", randomn)),
@@ -66,10 +77,10 @@ datalabels<-data %>%
                            format(time,"%Y%m%d%H%M")))
 datalabels
 #print all the data just in case
-write.csv(datalabels, paste0(alldata_file,fileformat), row.names=FALSE) 
+# safe.write.csv(datalabels, paste0(alldata_file,fileformat), row.names=FALSE) 
 #print csv for field sample labels
-write.csv(datalabels %>% select(field_sample_ID, sample_name,botnum),
-          paste0(field_file,fileformat), row.names=FALSE) 
+# safe.write.csv(datalabels %>% select(field_sample_ID, sample_name,botnum),
+#           paste0(field_file,fileformat), row.names=FALSE) 
 
 
 #add analytes that are TRUE
@@ -101,5 +112,15 @@ print(labdata)
 
 
 #print csv for lab sample labels
-write.csv(labdata %>% select(lab_sample_ID,sample_name,analysis), 
-          paste0(lab_file,fileformat), row.names=FALSE) 
+# safe.write.csv(labdata %>% select(lab_sample_ID,sample_name,analysis), 
+#           paste0(lab_file,fileformat), row.names=FALSE) 
+
+# Named list of data.frames for writing to an excel file
+
+write_data.frames <- list(
+  field_labels = datalabels,
+  lab_labels   = labdata
+)
+
+safe.write_xlsx(write_data.frames,
+           path = fileformat)

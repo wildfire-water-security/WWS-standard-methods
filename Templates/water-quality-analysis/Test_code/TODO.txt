@@ -3,3 +3,5 @@
 	-would need to save csv. and import csv. for analytes
 -Grab sample option
 -NEED TO PRINT OFF DATASHEETS
+
+-FIT BLANK AND UNBLANK LABELS IN ISCO SCRIPT
