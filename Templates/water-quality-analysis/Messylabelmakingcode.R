@@ -56,6 +56,11 @@ analysis_opt <- c("CN", "AQ", "NU", "EX", "LV")
 analysis_choice <- c(DOC, DOM, CCAL, Excess, Levoglucosan)
 
 analysiscodes <- analysis_opt[analysis_choice]
+# if(DOC) {analysiscodes <- append(analysiscodes,"CN")}
+# if(DOM) {analysiscodes <- append(analysiscodes,"AQ")}
+# if(CCAL) {analysiscodes <- append(analysiscodes,"NU")}
+# if(Excess) {analysiscodes <- append(analysiscodes,"EX")}
+# if(Levoglucosan) {analysiscodes <- append(analysiscodes,"LV")}
 analysiscodes
 
 analysisn <- length(analysiscodes) #how many analytes there are
@@ -87,3 +92,10 @@ write.csv(print_data_field, "field.csv", row.names=FALSE)
 print_data_lab <- labdata %>% select(lab_sample_ID,sample_name,analysis )
 print_data_lab #for lab
 write.csv(print_data_lab, "lab.csv", row.names=FALSE)
+
+
+kable(labdata, booktabs = TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position"), 
+                full_width = FALSE, 
+                font_size = 10) %>%
+  row_spec(0, bold = TRUE, color = "white", background = "#D7261E")
