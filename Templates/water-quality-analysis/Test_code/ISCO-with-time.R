@@ -1,19 +1,9 @@
+#load libraries
 library(dplyr)
 library(stringr)
 library(kableExtra)
 library(lubridate)
 library(writexl)
-# Function to safely write csvs without overwriting anything
-safe.write_xlsx <- function(x, path, ...) {
-  if(file.exists(path)) {
-    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
-         "We don't want to overwrite randomized sample names\n",
-         "Check ", path, " to see if the already written file is ok.")
-  }
-  write_xlsx(x, path, ...)
-}
-
-
 
 
 ######### Fill out##########
@@ -48,6 +38,16 @@ fileformat
 
 
 ##########Code#######################
+# Function to safely write csvs without overwriting anything
+safe.write_xlsx <- function(x, path, ...) {
+  if(file.exists(path)) {
+    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
+         "We don't want to overwrite randomized sample names\n",
+         "Check ", path, " to see if the already written file is ok.")
+  }
+  write_xlsx(x, path, ...)
+}
+
 sampleinfo <- data.frame(site=site,nsamp=nsamp,start=start,interval=interval,study=study,samp_type=samp_type) #all sample info for function
 sn <- sum(nsamp) #total sample amount
 
@@ -76,6 +76,11 @@ datalabels<-data %>%
                            samp_type,"_",
                            format(time,"%Y%m%d%H%M")))
 datalabels
+
+
+
+
+
 #print all the data just in case
 # safe.write.csv(datalabels, paste0(alldata_file,fileformat), row.names=FALSE) 
 #print csv for field sample labels
@@ -103,12 +108,18 @@ datacodes<- data.frame(code = rep(analysiscodes,times=sn)) %>% #add labcodes
     TRUE ~ NA_character_
   ))
 datacodes
-#repeat samples for each analysis
-labdata <- datalabels %>% slice(rep(1:n(), each = analysisn)) %>%
+
+#sort the data by the randomn, since they should be filtered that way
+datasortlab <- datalabels[order(data$randomn),]
+datasortlab #use this to print datasheets out
+
+#repeat sample rows for each analysis
+labdata <- datasortlab %>% slice(rep(1:n(), each = analysisn)) %>%
 mutate(datacodes,
        lab_sample_ID =
         paste0(field_sample_ID, "_", datacodes$code ))
 print(labdata)
+
 
 
 #print csv for lab sample labels
@@ -118,9 +129,11 @@ print(labdata)
 # Named list of data.frames for writing to an excel file
 
 write_data.frames <- list(
-  field_labels = datalabels,
-  lab_labels   = labdata
+  field_labels = datalabels %>% select(field_sample_ID,sample_name,botnum),
+  lab_labels   = labdata %>% select(lab_sample_ID,sample_name,analysis),
+  label_metadata = datalabels %>% select(site,time,study,samp_type,randomn,botnum)
 )
+#THE TIME ISN'T PRINTING CORRECTLY ON HERE
 
 safe.write_xlsx(write_data.frames,
            path = fileformat)
