@@ -16,6 +16,7 @@ site <- c("STA","COA")
 nsamp <- c(24,24) #amount of samples per site. Matches the site vector above.
 interval <- c(2,2) #interval of sampling ISCO is programmed for, usually 2hrs
 sc <- "20260224" #what sample campaign this is, the date it starts "YYYYMMDD". This is for file name purposes
+TZone <- "Etc/GMT+8"
 
 #optional: add grab samples. Not sure how to code this yet.How to include in random numbers???? Make own dataframe? Just have blank IDs in the lab?
 GRAB <- FALSE #fill TRUE for having grab samples, FALSE for not. 
@@ -83,7 +84,7 @@ if (knowntime == TRUE){
     timestart <- as.POSIXct(sampleinfo$start)
     timelist <- seq(timestart, by=paste0(sampleinfo$interval, " hours"), length = sampleinfo$nsamp)
     botnum <- rep(1:24, times= ceiling(sampleinfo$nsamp/24))[1:sampleinfo$nsamp] #added interval so if we ever want to change it, it's flexible
-    return(data.frame(site =sitelist, time=timelist, botnum = botnum, study=sampleinfo$study,samp_type=sampleinfo$samp_type,datetime=format(timelist,"%Y%m%d%H%M"))) #could include other label things in here too
+    return(data.frame(site =sitelist, time=timelist, botnum = botnum, study=sampleinfo$study,samp_type=sampleinfo$samp_type,datetime_PST=format(timelist,"%Y%m%d%H%M"))) #could include other label things in here too
   }
 } else if (knowntime == FALSE){
   site_label <- function(sampleinfo){
@@ -105,7 +106,7 @@ datalabels<-data %>%
          field_sample_ID = paste0(study, "_",
                                   site, "_",
                                   samp_type,"_",
-                                  datetime))
+                                  datetime_PST))
 }else if (knowntime == FALSE ){
   datalabels<-data %>%
     mutate(sample_name=paste0( study, "_", "R", sprintf("%04d", randomn)),
@@ -118,8 +119,9 @@ datalabels
 #this prints your data labels out if you have blank samples, since you will need to rerun this code again. 
 if(knowntime == FALSE){
   safe.write_csv(datalabels,
-                 path = blank_fileformat)
-  stop("DO NOT CONTINUE UNTIL YOU HAVE YOUR TIMES")}
+                 path = blank_fileformat,
+                 row.names = FALSE)
+  stop("DO NOT CONTINUE UNTIL YOU HAVE YOUR TIMES. SAVE YOUR CODE")}
 
 
 
@@ -130,18 +132,28 @@ if(knowntime == FALSE){
 #and import data set 
 newtimes <- c("2026-02-23 15:00","2026-02-23 17:00")
 if(knowntime == FALSE){
-  datalabeles <- read.csv(blank_fileformat)
+  datalabels <- read.csv(blank_fileformat)
   }
-datalabeles
+datalabels
 if(knowntime == FALSE){
   site_label_blank <- function(sampleinfo){
-    timestart <- as.POSIXct(sampleinfo$start)
+    # Time code - need to fix time zones
+    timestart <- as.POSIXct(sampleinfo$start, tz = TZone)
     timelist <- seq(timestart, by=paste0(sampleinfo$interval, " hours"), length = sampleinfo$nsamp)
-    return(data.frame(time=timelist,datetime=format(timelist,"%Y%m%d%H%M"))) #could include other label things in here too
+    return(data.frame(time_PST=as.character(timelist),datetime_PST=format(timelist,"%Y%m%d%H%M"))) #could include other label things in here too
   }} 
   data_times <- lapply(1:nrow(sampleinfo),function(x){site_label_blank(sampleinfo[x,])}) %>%
-  bind_rows()
-  datalables 
+  bind_rows %>%
+    mutate(datalabels)
+    
+  data_times <- mutate(data_times, field_sample_ID = paste0(study, "_",
+                                    site, "_",
+                                    samp_type,"_",
+                                    datetime_PST))
+  
+
+  data_times
+  datalabels 
 
 #print all the data just in case
 # safe.write.csv(datalabels, paste0(alldata_file,fileformat), row.names=FALSE) 
@@ -176,7 +188,7 @@ datacodes<- data.frame(code = rep(analysiscodes,times=sn)) %>% #add labcodes
 datacodes
 
 #sort the data by the randomn, since they should be filtered that way
-datasortlab <- datalabels[order(data$randomn),]
+datasortlab <- data_times[order(data_times$randomn),]
 datasortlab #use this to print datasheets out
 
 #repeat sample rows for each analysis
@@ -194,10 +206,12 @@ print(labdata)
 
 # Named list of data.frames for writing to an excel file
 
+
+#
 write_data.frames <- list(
-  field_labels = datalabels %>% select(field_sample_ID,sample_name,botnum),
+  field_labels = data_times %>% select(field_sample_ID,sample_name,botnum),
   lab_labels   = labdata %>% select(lab_sample_ID,sample_name,analysis),
-  label_metadata = datalabels %>% select(site,time,study,samp_type,randomn,botnum)
+  label_metadata = data_times %>% select(site,time_PST,study,samp_type,randomn,botnum)
 )
 #THE TIME ISN'T PRINTING CORRECTLY ON HERE
 
