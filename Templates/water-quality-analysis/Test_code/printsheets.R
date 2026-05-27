@@ -5,7 +5,9 @@ labsheet
 samplesheet <- read.csv("fieldsamples_SSEMG_IS_20260223.csv")
 samplesheet
 
-
+library(dplyr)
+library(stringr)
+library(kableExtra)
 #Filtering sheet: organize by random IDs, include filters and analyte bottles
 #fieldsheet: organize by samples, include extra columns 
 

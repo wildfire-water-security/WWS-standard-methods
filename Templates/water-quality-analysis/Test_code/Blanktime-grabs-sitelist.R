@@ -1,33 +1,30 @@
 library(dplyr)
 library(stringr)
-library(kableExtra)
 library(lubridate)
- 
+library(writexl)
+
 #this one is assuming you are going to the field with blank times and will
 #fill the dates into the made spreadsheet and use that to print lab labels
 #this is for unique site names!
 # Function to safely write csvs without overwriting anything
-safe.write.csv <- function(x, file, ...) {
-  if(file.exists(file)) {
-    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
-         "We don't want to overwrite randomized sample names\n",
-         "Check ", file, " to see if the already written file is ok.")
-  }
-  write.csv(x, file, ...)
-}
 
 ######### Filling in codes##########
-project <- "WWS" #the large project code
 study <- "BDRK" #the study code
 samp_type <- "GB" #(GB,IS, SS, etc.)
 rn <- 1 #the stat of a random number sequence
 site <- read.csv("example_sites.csv") #import your site list. Has the header "site"
 #not sure how to do this without a specific header...
 site
-time <- "____________" #either have it blank or with sampling date "____________" or "YYYYMMDD____"
-time
+blank_time <- "____________" #either have it blank or with sampling date "____________" or "YYYYMMDD____"
+blank_time
 sc <- "20260823" #what sample campaign this is. Either date ex."20260223 or campaign ex. "1"
 
+#fill out analysis
+DOM <- TRUE
+DOC <- TRUE
+CCAL <- FALSE
+Levoglucosan <- TRUE
+Excess <- FALSE
 
 ####optional formatting- fill out#####
 alldata_blank_file <- "alldata_blank" #what to call header for blank times alldata file
@@ -39,26 +36,57 @@ lab_file <-  "labsamples" #what to call header for lab label file
 #header_study_sapmpletype_date 
 fileformat <- paste0("_",study,"_",samp_type,"_",sc,".csv") 
 fileformat
-
-#save your entries (for option #4 in next step)
-filenames <- data.frame(project=project,study=study,sc=sc,
-                      alldata_file=alldata_file,field_file=field_file,lab_file=lab_file)
-filenames
+#filenames
 safe.write.csv(filenames,paste0("filenames","_",fileformat))
 
 
+fileformat <- paste0(study,"_",samp_type,"_",sc,"_label-table.xlsx") 
+fileformat
+blank_fileformat <- paste0("blank_",study,"_",samp_type,"_",sc,"_label-table.csv") 
+blank_fileformat
+
+
+
+
+
 ##########code########
+
+
+
 sn <- nrow(site) #how many sites there are
 sn #each label sheet prints 30 samples
 
+#safewrite function 
+safe.write_xlsx <- function(x, path, ...) {
+  if(file.exists(path)) {
+    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
+         "We don't want to overwrite randomized sample names\n",
+         "Check ", path, " to see if the already written file is ok.")
+  }
+  write_xlsx(x, path, ...)
+}
+safe.write_csv <- function(x, path, ...) {
+  if(file.exists(path)) {
+    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
+         "We don't want to overwrite randomized sample names\n",
+         "Check ", path, " to see if the already written file is ok.")
+  }
+  write.csv(x, path, ...)
+} 
+
 #Adds random numbers to data frame
+
+
 datablank<- data.frame(site) %>%
   mutate(study=study,
          samp_type=samp_type,
-         blank_time=time,
+         blank_time=blank_time,
          randomn= sample(rn:sn,sn, replace=F)
          ) 
 datablank
+
+
+
 #adds blank sample IDs, sample names, and adds text columns to fill out for date and time
 blanklabels <- datablank %>%
   mutate(sample_name=paste0( study, "_", "R", sprintf("%04d", randomn)), #adds sample name
@@ -69,128 +97,38 @@ blanklabels <- datablank %>%
          date_text = rep('', nrow(datablank)), time_text = rep('', nrow(datablank))) #adds column names to fill out. Puts NAs in them though
 blanklabels
 #print blank labels 
-safe.write.csv(blanklabels, paste0("alldata_blank",fileformat), row.names=FALSE)
-#Before filtering- fill out blank columns for date and time and print lab labels
-#Make sure to do it in text only! 
-  #For example: for 8:00am write 800 instead of 08:00, for 2pm write 1400
+safe.write_csv(blanklabels, paste0(blank_fileformat), row.names=FALSE)
 
-#print blank field labels
-safe.write.csv(blanklabels %>% select(field_sample_ID_blank, sample_name, site),
-          paste0("fieldsamples_blank",fileformat), row.names=FALSE)  #file format is fieldsamples_study_sapmpletype_date
+stop("Before printing lab labels out- fill out blank columns for date and time and print lab labels (as text only! example: for 8:00am write 800 instead of 08:00, for 2pm write 1400), save file.")
 
 
-
-
-############morning of filtering- should be it's own code########################
-
-#fill out analysis
-DOM <- TRUE
-DOC <- TRUE
-CCAL <- FALSE
-Levoglucosan <- TRUE
-Excess <- FALSE
-
-DOM
-
-##We don't want to accidentally re-run the top code because it will return new random numbers and overwrite files#
-
-#choose option: (could make this an if statement but think one of these will get deleted)
-#option 1: import blank csv, make copy and fill it out
-#option 2:import the csv you've already filled out
-#option 3: refill out all parts 
-#option 4: import data for filenames and create them there
-
-#Reminder:fill out blank columns for date and time and print lab labels
-  #Make sure to do it in text only! 
-  #For example: for 8:00am write 800 instead of 08:00, for 2pm write 1400
-
-  ##option 1#####
-#import your blank csv`
-mycsv<- "alldata_BDRK_GB_20260823.csv"
-header <- "alldata_blank_" #what the header was on the file (before site)
-#make a copy
-safe.write.csv(mycsvblank,sub(header,'alldata_filled_',mycsvblank))
-#fill out the date_text and time_text sections of new csv and save 
-mycsv <- sub(header,'alldata_filled_',mycsvblank)
-mycsv
-
-####optional formatting- fill out#####
-###alldata_filled <- "alldata_filled" #what to call header for filled out alldata file
-field_file <-  "fieldsamples_blank" #what to call header for field label file
-lab_file <-  "labsamples" #what to call header for lab label file
-
-  ##option 2#####
-#Note: the date_text and time_text columns were already filled out.
-#Note: rename the file to take the _blank part out
-#import csv
-mycsv<- "alldata_BDRK_GB_20260823.csv"
-header <- "alldata_" #what the header was on the file (before site)
-
-####optional formatting- fill out#####
-###alldata_filled <- "alldata_filled" #what to call header for filled out alldata file
-field_file <-  "fieldsamples_blank" #what to call header for field label file
-lab_file <-  "labsamples" #what to call header for lab label file
-
-
-
-######
-
-#refill out this section: should match the top of the code. We don't want to re-run
-#the top code because it will return new random numbers and overwrite files 
-
-project <- "WWS" #the large project code
-study <- "BDRK" #the study code
-samp_type <- "GB" #(GB,IS, SS, etc.)
-sc <- "20260823" #what sample campaign this is. Either date ex."20260223 or campaign ex. "1"
-
-###optional formatting- fill out
-fileformat <- paste0("_",study,"_",samp_type,"_",sc,".csv") 
-fileformat
-
-
-
-
-labsamplefile<-sub(header,'labsamples_',mycsv)
-labsamplefile
-newname
-
-
-
-
-
-
+################
+#re-run top of code, library through safewrite functions  ~line 75
+#import data 
+datalabels <- read.csv(blank_fileformat) #bring in the saved data labels. 
+datalabels
+stop("check that date_text and time_text rows were filled out in the consol")
 
 
 #########code#########
 #what format the files will end with. ex this returns:#alldata_study_sapmpletype_date 
-datafilled<-read.csv(mycsv) 
-datafilled 
+
 #make datetimes and the sampleID with times
-sn <- nrow(datafilled ) #how many sites there are
-sn 
-alldata<-datafilled %>%
+
+data<-datalabels %>%
   mutate(datetime=
-           paste0(sprintf("%06d",datafilled$date_text),
-                  sprintf("%04d",datafilled$time_text)),
+           paste0(sprintf("%06d",datalabels$date_text),
+                  sprintf("%04d",datalabels$time_text)),
          field_sample_ID =
            paste0(study, "_",
                   site, "_",
                   samp_type,"_",
                   datetime))
 
-alldata
-#WHY WON'T YOU WORK*************
-#datafilled2 <-mutate(datafilled,
-                     #datetime=
-                       #as.POSIXct(paste(date,time),format = "%Y%m%d%H%M"))
-
-
-#texttime <- as.character(paste(datafilled$date,datafilled$time))
-#texttime1 <- as.POSIXct(texttime)
-##############pretend that worked
-
-
-
+data
+#sort the data by the randomn, since they should be filtered that way
+datasortlab <- data[order(data$randomn),]
+datasortlab #use this to print datasheets out
 
 #add analytes that are TRUE
 analysis_opt <- c("CN", "AQ", "NU", "EX", "LV")
@@ -213,7 +151,7 @@ datacodes<- data.frame(code = rep(analysiscodes,times=sn)) %>% #add labcodes
   ))
 datacodes
 #repeat samples for each analysis
-labdata <- alldata %>% slice(rep(1:n(), each = analysisn)) %>%
+labdata <- datasortlab %>% slice(rep(1:n(), each = analysisn)) %>%
 mutate(datacodes,
        lab_sample_ID =
         paste0(study, "_",
@@ -224,10 +162,11 @@ mutate(datacodes,
 
 labdata
 #printing
-safe.write.csv(labdata %>% select(lab_sample_ID,sample_name,analysis), 
-          paste0("labsamples",fileformat), row.names=FALSE)
+write_data.frames <- list(
+  filter_labels = datasortlab %>% select(field_sample_ID,sample_name),
+  lab_labels   = labdata %>% select(lab_sample_ID,sample_name,analysis),
+  label_metadata = data %>% select(site,datetime,study,samp_type,randomn) #was just a dump for things
+)
+safe.write_xlsx(write_data.frames,
+                path = fileformat)
 
-##print_data_lab <- labdata %>% select(lab_sample_ID,sample_name,analysis)
-#print_data_lab #for lab
-#paste0("fieldsamples",fileformat)
-#safe.write.csv(print_data_lab, "lab.csv", row.names=FALSE)
