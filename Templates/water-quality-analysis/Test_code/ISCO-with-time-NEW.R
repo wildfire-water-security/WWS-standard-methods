@@ -3,11 +3,10 @@ library(dplyr)
 library(stringr)
 library(lubridate)
 library(writexl)
-
+library(readxl)
 ############ Fill out##############
 
 #sample information:
-project <- "WWS" #the large project code
 study <- "SSEMG" #the study code
 samp_type <- "IS" #(GB,IS, SS, etc.)
 rn <- 1 #the stat of a random number sequence
@@ -18,9 +17,12 @@ sc <- "20260224" #what sample campaign this is, the date it starts "YYYYMMDD". T
 TZone <- "Etc/GMT+8"
 
 #optional: add grab samples. Not sure how to code this yet.How to include in random numbers???? Make own dataframe? Just have blank IDs in the lab?
-GRAB <- FALSE #fill TRUE for having grab samples, FALSE for not. 
-grabsamp <- c(1,1) #grab samples per site
 
+GRAB <- FALSE #fill TRUE for having grab samples, FALSE for not. 
+grabsampn <- 4 #total number of grab samples expected
+grabsamp <- c(2,2) #samples per site 
+blk <- TRUE #add procedural blank?
+blkname <-"mr_blanky"
 #sample times:
 #fill if you have known time:
 start <- c("2026-02-23 15:00","2026-02-23 17:00")
@@ -68,11 +70,29 @@ site_label <- function(sampleinfo){
     return(data.frame(site =sitelist, time_PST =timelist, botnum = botnum, study=sampleinfo$study,samp_type=sampleinfo$samp_type,datetime_PST=format(timelist,"%Y%m%d%H%M"))) #could include other label things in here too
   }
 
+#add grabs
+if(GRAB==TRUE){
+  
+}
+
+
 #make the sample table from the function and add random numbers to it. Re-running will change the random numbers.
 data <- lapply(1:nrow(sampleinfo),function(x){site_label(sampleinfo[x,])})%>%
-  bind_rows() %>%
-  mutate (randomn= sample(rn:sn,sn, replace=F))
-data
+  bind_rows()
+  
+
+  
+  data
+grabby <- data.frame(grabsamp=site, re)
+grabby
+  grabs <- append(data,)
+
+#old
+# data <- lapply(1:nrow(sampleinfo),function(x){site_label(sampleinfo[x,])})%>%
+#   bind_rows() %>%
+#   mutate (randomn= sample(rn:sn,sn, replace=F))
+# data
+
 
 #add sample names and IDs
   datalabels<-data %>%
@@ -134,10 +154,10 @@ print(labdata)
 
 #
 write_data.frames <- list(
-  field_labels = datalabels %>% select(field_sample_ID,sample_name,botnum), #no sample ID?
-  filtering = datasortlab %>% select(field_sample_ID,sample_name,botnum),
-  lab_labels   = labdata %>% select(lab_sample_ID,sample_name,analysis),
-  label_metadata = datalabels %>% select(site,time_PST,study,samp_type,randomn,botnum) #jsut extra didn't know what to add
+  field_labels = datalabels %>% select(sample_name,field_sample_ID,botnum), #no sample ID?
+  filtering = datasortlab %>% select(sample_name,field_sample_ID),
+  lab_labels   = labdata %>% select(sample_name,lab_sample_ID,analysis),
+  label_metadata = datalabels %>% select(site,datetime_PST,study,samp_type,randomn,botnum) #jsut extra didn't know what to add
 )
 
 safe.write_xlsx(write_data.frames,

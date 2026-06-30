@@ -1,13 +1,13 @@
-#load libraries
+#####load libraries----
 library(dplyr)
 library(stringr)
 library(kableExtra)
 library(lubridate)
 library(writexl)
 
-############ Fill out##############
+#####Fill out section#####
 
-#sample information:
+##sample information
 study <- "SSEMG" #the study code
 samp_type <- "IS" #(GB,IS, SS, etc.)
 rn <- 1 #the stat of a random number sequence
@@ -38,7 +38,7 @@ fileformat
 blank_fileformat <- paste0("blank_",study,"_",samp_type,"_",sc,"_label-table.csv") 
 blank_fileformat
 
-########## Code pt.1- don't change #######################
+########## Code pt.1- don't change ################
 
 #If doing blank samples, rerun this section in part two
 #start#
@@ -50,6 +50,7 @@ sampleinfo
 
 #would need to alter if it includes grabs 
 # Functions to safely write slsxs and csvs without overwriting anything
+
 safe.write_xlsx <- function(x, path, ...) {
   if(file.exists(path)) {
     stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",

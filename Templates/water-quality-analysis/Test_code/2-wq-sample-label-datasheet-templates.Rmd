@@ -1,0 +1,65 @@
+---
+title: "wq-sample-label-datasheet-templates"
+output:
+  pdf_document: default
+  header-includes:
+    - \usepackage{pdflscape}
+    - \newcommand{\blandscape}{\begin{landscape}}
+    - \newcommand{\elandscape}{\end{landscape}}
+---
+
+```{r libraries}
+library(dplyr)
+library(stringr)
+library(kableExtra)
+```
+
+# Importing data
+
+```{r}
+samplesheet <- read.csv("example_label-table2.csv")
+```
+
+# Making the tables
+
+This part will be a little more complicated, since we want specific formatting. I think if we use the LaTeX command below (which is what the Rmarkdown uses to convert to PDF), it should start a new page that we can format how we like. I'm new to this part too, so we could do some research together when you get here.
+
+\\newpage
+
+\blandscape
+
+Date: \_\_\_\_\_\_\_\_\_\_\_\_\_
+
+Technician(s): \_\_\_\_\_\_\_\_\_\_\_\_\_\_
+
+```{r bottle numbers, echo=FALSE}
+kable(samplesheet,booktabs=TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position","repeat_header"), 
+                full_width = FALSE, 
+                font_size = 10) %>%
+  row_spec(0, bold = TRUE, color = "black", background = "#67c4db")
+
+```
+
+\elandscape
+
+\newpage
+
+```{r bottle weights, echo=FALSE}
+kable(samplesheet,booktabs=TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position","repeat_header"), 
+                full_width = FALSE, 
+                font_size = 10) %>%
+  row_spec(0, bold = TRUE, color = "black", background = "#67c4db")
+```
+
+\newpage
+
+```{r filter weights, echo=FALSE}
+kable(samplesheet,booktabs=TRUE) %>%
+  kable_styling(latex_options = c("striped", "hold_position","repeat_header"), 
+                full_width = FALSE, 
+                font_size = 10) %>%
+  row_spec(0, bold = TRUE, color = "black", background = "#67c4db")
+
+```
