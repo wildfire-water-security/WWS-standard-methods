@@ -14,15 +14,12 @@ rn <- 1 #the stat of a random number sequence
 site <- c("STA","COA")
 nsamp <- c(24,24) #amount of samples per site. Matches the site vector above.
 interval <- c(2,2) #interval of sampling ISCO is programmed for, usually 2hrs
-sc <- "20260224" #what sample campaign this is, the date it starts "YYYYMMDD". This is for file name purposes
+sc <- "20260220" #what sample campaign this is, the date it starts "YYYYMMDD". This is for file name purposes. If it is an unknown then do something like "study_campaign_#"
 TZone <- "Etc/GMT+8"
 
-#optional: add grab samples. Not sure how to code this yet.How to include in random numbers???? Make own dataframe? Just have blank IDs in the lab?
-GRAB <- FALSE #fill TRUE for having grab samples, FALSE for not. 
-grabsamp <- c(1,1) #grab samples per site
 
 #sample times:
-knowntime <- FALSE #fill TRUE When you have a time start and FALSE for if you don't know the time start. Knowing the time is the most efficient method.Important for If statements.  
+knowntime <- TRUE #fill TRUE When you have a time start and FALSE for if you don't know the time start. Knowing the time is the most efficient method.Important for If statements.  
 #fill if you have known time:
 start <- c("2026-02-23 15:00","2026-02-23 17:00")
 #fill if you don't know time:
@@ -35,15 +32,14 @@ CCAL <- TRUE
 Levoglucosan <- TRUE
 Excess <- TRUE
 
-#optional formatting- could delete this and just have it in the code
-alldata_file <- "alldata" #what to call header for alldata file
-field_file <-  "fieldsamples" #what to call header for field label file
-lab_file <-  "labsamples" #what to call header for lab label file
+
+
+#optional change:
 #what format the files will end with. ex this returns: study_sapmpletype_date_label-table 
-fileformat <- paste0(study,"_",samp_type,"_",sc,"_label-table.xlsx") 
+fileformat <- paste0(study,"_",samp_type,"_",sc,"_label-table.xlsx") #the file name
 fileformat
 blank_fileformat <- paste0("blank_",study,"_",samp_type,"_",sc,"_label-table.csv") 
-blank_fileformat
+blank_fileformat 
 
 
 ########## Code pt.1- don't change #######################
@@ -51,9 +47,16 @@ blank_fileformat
 #If doing blank samples, rerun this section in part two
 #start#
 sn <- sum(nsamp) #total sample amount from the vector that was filled out
+
+
+
 #adding sample information
 sampleinfo <- data.frame(site=site,nsamp=nsamp,start=start,interval=interval,study=study,samp_type=samp_type,blanktime=blanktime) #all sample info for the function
 #would need to alter if it includes grabs 
+
+
+
+
 # Functions to safely write slsxs and csvs without overwriting anything
 safe.write_xlsx <- function(x, path, ...) {
   if(file.exists(path)) {
@@ -83,7 +86,10 @@ if (knowntime == TRUE){
     timestart <- as.POSIXct(sampleinfo$start)
     timelist <- seq(timestart, by=paste0(sampleinfo$interval, " hours"), length = sampleinfo$nsamp)
     botnum <- rep(1:24, times= ceiling(sampleinfo$nsamp/24))[1:sampleinfo$nsamp] #added interval so if we ever want to change it, it's flexible
-    return(data.frame(site =sitelist, time=timelist, botnum = botnum, study=sampleinfo$study,samp_type=sampleinfo$samp_type,datetime_PST=format(timelist,"%Y%m%d%H%M"))) #could include other label things in here too
+    return(data.frame(site =sitelist, timelist=timelist, 
+                      botnum = botnum, study=sampleinfo$study,
+                      samp_type=sampleinfo$samp_type,
+                      datetime_PST=format(timelist,"%Y%m%d%H%M"))) #could include other label things in here too
   }
 } else if (knowntime == FALSE){
   site_label <- function(sampleinfo){
@@ -94,25 +100,27 @@ if (knowntime == TRUE){
 }
 #make the sample table from the function and add random numbers to it. Re-running will change the random numbers.
 data <- lapply(1:nrow(sampleinfo),function(x){site_label(sampleinfo[x,])})%>%
-  bind_rows() %>%
+  bind_rows()%>%
   mutate (randomn= sample(rn:sn,sn, replace=F))
 data
 
+
+####
 #add sample names and IDs
 if (knowntime == TRUE){
-datalabels<-data %>%
-  mutate(sample_name=paste0( study, "_", "R", sprintf("%04d", randomn)),
-         field_sample_ID = paste0(study, "_",
-                                  site, "_",
-                                  samp_type,"_",
-                                  datetime_PST))
+  datalabels<-data %>%
+    mutate(sample_name=paste0( study, "_", "R", sprintf("%04d", randomn)),
+           field_sample_ID = paste0(study, "_",
+                                    site, "_",
+                                    samp_type,"_",
+                                    datetime_PST))
 }else if (knowntime == FALSE ){
   datalabels<-data %>%
     mutate(sample_name=paste0( study, "_", "R", sprintf("%04d", randomn)),
            field_sample_ID_blank = paste0(study, "_",
-                                    site, "_",
-                                    samp_type,"_",
-                                    blanktime))}
+                                          site, "_",
+                                          samp_type,"_",
+                                          blanktime))}
 datalabels
 
 #this prints your data labels out if you have blank samples, since you will need to rerun this code again. 
@@ -129,11 +137,19 @@ if(knowntime == FALSE){
 #section for blank labels 
 #if you have blank times: if the code isn't still loaded: rerun the 'fillout' section and the top section in 'code pt.1'. leave knownsamples = FALSE
 #and import data set 
+
 newtimes <- c("2026-02-23 15:00","2026-02-23 17:00")
+
+
+
 if(knowntime == FALSE){
   datalabels <- read.csv(blank_fileformat)
-  }
+}
+
 datalabels
+
+
+
 if(knowntime == FALSE){
   site_label_blank <- function(sampleinfo){
     # Time code - need to fix time zones
@@ -141,18 +157,18 @@ if(knowntime == FALSE){
     timelist <- seq(timestart, by=paste0(sampleinfo$interval, " hours"), length = sampleinfo$nsamp)
     return(data.frame(time_PST=as.character(timelist),datetime_PST=format(timelist,"%Y%m%d%H%M"))) #could include other label things in here too
   }} 
-  data_times <- lapply(1:nrow(sampleinfo),function(x){site_label_blank(sampleinfo[x,])}) %>%
+data_times <- lapply(1:nrow(sampleinfo),function(x){site_label_blank(sampleinfo[x,])}) %>%
   bind_rows %>%
-    mutate(datalabels)
-    
-  data_times <- mutate(data_times, field_sample_ID = paste0(study, "_",
-                                    site, "_",
-                                    samp_type,"_",
-                                    datetime_PST))
-  
+  mutate(datalabels)
 
-  data_times
-  datalabels 
+data_times <- mutate(data_times, field_sample_ID = paste0(study, "_",
+                                                          site, "_",
+                                                          samp_type,"_",
+                                                          datetime_PST))
+
+
+data_times
+datalabels 
 data
 #print all the data just in case
 # safe.write.csv(datalabels, paste0(alldata_file,fileformat), row.names=FALSE) 

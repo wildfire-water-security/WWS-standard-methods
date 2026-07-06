@@ -1,0 +1,193 @@
+---
+title: "Untitled"
+author: "Emily Nussdorfer"
+date: "2026-07-01"
+output: html_document
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+Filling in pt 1 #this is for unique site names! #this one is assuming
+you are going to the field with blank times and will fill the dates into
+the generated spreadsheet use that to print lab labels
+
+```{r}
+######### Filling in codes##########
+study <- "BDRK" #the study code
+samp_type <- "GB" #(GB,IS, SS, etc.)
+rn <- 1 #the start of a random number sequence. May change with projects or studies
+site <- read.csv("example_sites.csv") #import your site list. This file needs to have the header "site"
+#not sure how to do this without a specific header...
+site
+blank_time <- "____________" #either have it blank or with sampling date "____________" or "YYYYMMDD____"
+blank_time
+sc <- "20260823" #what sample campaign this is. Either date ex."20260223 or campaign ex. "1"
+
+#fill out analysis
+DOM <- TRUE
+DOC <- TRUE
+CCAL <- FALSE
+Levoglucosan <- TRUE
+Excess <- FALSE
+
+####optional formatting- fill out#####
+alldata_blank_file <- "alldata_blank" #what to call header for blank times alldata file
+alldata_file <- "alldata" #what to call header for alldata file you fill out
+field_file <-  "fieldsamples" #what to call header for field label file
+lab_file <-  "labsamples" #what to call header for lab label file
+
+#what format the files will end with. ex this returns:
+fileformat <- paste0(study,"_",samp_type,"_",sc,"_label-table.xlsx") 
+fileformat
+blank_fileformat <- paste0("blank_",study,"_",samp_type,"_",sc,"_label-table.csv") 
+blank_fileformat
+
+```
+
+Libraries pt 2
+
+```{r}
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(writexl)
+```
+
+pt 3
+
+```{r}
+sn <- nrow(site) #how many sites there are
+sn #each label sheet prints 30 samples
+
+#safewrite function 
+safe.write_xlsx <- function(x, path, ...) {
+  if(file.exists(path)) {
+    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
+         "We don't want to overwrite randomized sample names\n",
+         "Check ", path, " to see if the already written file is ok.")
+  }
+  write_xlsx(x, path, ...)
+}
+safe.write_csv <- function(x, path, ...) {
+  if(file.exists(path)) {
+    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
+         "We don't want to overwrite randomized sample names\n",
+         "Check ", path, " to see if the already written file is ok.")
+  }
+  write.csv(x, path, ...)
+} 
+```
+
+pt 4 save file, save code do not re-run on second round! print the
+blanks off
+
+```{r}
+#Adds random numbers to data frame. Re-running will randomize them again!
+datablank<- data.frame(site) %>%
+  mutate(study=study,
+         samp_type=samp_type,
+         blank_time=blank_time,
+         randomn= sample(rn:sn,sn, replace=F),
+         date_text_PST = "",
+         time_text_PST ="") 
+datablank
+
+#adds blank sample IDs, sample names, and adds text columns to fill out for date and time
+blank_labels <- datablank %>%
+  mutate(sample_name=paste0( study, "_", "R", sprintf("%04d", randomn)), #adds sample name
+         field_sample_ID_blank = paste0(study, "_",
+                                        site, "_",
+                                        samp_type,"_",
+                                        blank_time))#adds blank sample ID
+         #date_text_PST = rep('', nrow(datablank)), time_text_PST = rep('', nrow(datablank))) #adds column names to fill out could've been added in previous code section but I like it being on the far right for data entry. Do later?
+blank_labels 
+#print blank labels 
+print <- blank_labels %>% select(sample_name,field_sample_ID_blank,study,site,date_text_PST,time_text_PST) #reorder so it's easier for data entry
+safe.write_csv(print, blank_fileformat, row.names=FALSE)
+
+stop("Before printing lab labels out- fill out blank columns for date and time and print lab labels (as text only! example: for 2PST write 1400- make sure it's not PDT), save file.")
+
+
+```
+
+pt 5 before running this part, fill out the time_text column and save
+file rerun parts 1-3. IMPORTANT: DO NOT RUN PART 4 again. If you do,
+clear the workspace and try again
+
+```{r, edit}
+datalabels <- read.csv(blank_fileformat) #bring in the saved data labels. 
+datalabels
+stop("check that date_text and time_text rows were filled out in the consol")
+```
+
+pt 6
+
+```{r}
+#make datetimes and the sampleID with times
+
+data<-datalabels %>%
+  mutate(datetime_PST=
+           paste0(sprintf("%06d",datalabels$date_text_PST),"_",
+                  sprintf("%04d",datalabels$time_text_PST)),
+         field_sample_ID =
+           paste0(study, "_",
+                  site, "_",
+                  samp_type,"_",
+                  datetime_PST))
+
+data
+#sort the data by the randomn, since they should be filtered that way
+datasortlab <- data[order(data$randomn),]
+datasortlab #use this to print datasheets out
+```
+
+pt 7
+
+```{r}
+#add analytes that are TRUE
+analysis_opt <- c("CN", "AQ", "NU", "EX", "LV")
+analysis_choice <- c(DOC, DOM, CCAL, Excess, Levoglucosan)
+
+analysiscodes <- analysis_opt[analysis_choice]
+analysiscodes
+
+analysisn <- length(analysiscodes) #how many analytes there are
+samples <- analysisn*sn #how many total filtered samples
+
+datacodes<- data.frame(code = rep(analysiscodes,times=sn)) %>% #add labcodes
+  mutate(analysis = case_when(
+    code == "CN" ~ "Shimadzu",
+    code == "AQ" ~ "Aqualog",
+    code == "NU" ~ "CCAL",
+    code == "LV" ~ "Levoglucosan",
+    code == "EX" ~ "Excess",
+    TRUE ~ NA_character_
+  ))
+datacodes
+#repeat samples for each analysis
+labdata <- datasortlab %>% slice(rep(1:n(), each = analysisn)) %>%
+mutate(datacodes,
+       lab_sample_ID =
+        paste0(study, "_",
+                      site, "_",
+                      samp_type,"_",
+                      datetime_PST,"_", 
+                      datacodes$code ))
+
+labdata
+```
+
+printing
+
+```{r}
+write_data.frames <- list(
+ 
+  lab_labels   = labdata %>% select(sample_name,lab_sample_ID,analysis),
+  lab_filter_sheets = datasortlab %>% select(sample_name,field_sample_ID),
+  label_metadata = data %>% select(site,datetime_PST,study,samp_type,randomn) #was just a dump for things
+)
+safe.write_xlsx(write_data.frames,
+                path = fileformat)
+
+```

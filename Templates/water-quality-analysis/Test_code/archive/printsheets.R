@@ -3,21 +3,22 @@
 
 library(readxl)
 #for note sheets
-labsheet <- read_excel("SSEMG_IS_20260224_label-table.xlsx", sheet ="filtering")
+datasheet <- "SSEMG_IS_20260224_label-table.xlsx"
+labsheet <- read_excel(datasheet, sheet ="filtering")
 labsheet
 labsheets <- data.frame(labsheet)
 labsheets
 #for weight
-waterweight <- mutate(labsheets,pre_weight="", post_weight="",notes="")
-waterweight
+sampleweight <- mutate(labsheets,pre_weight="", post_weight="",notes="")
+sampleweight
 #for filtering
 filtering <- mutate(labsheet, Aqualog = "",Shimadzu = "", CCAL ="",Levo="",Excess="",notes="")
 filtering
 filterweights <- mutate(labsheet,pre_weight="", post_weight="",notes="")
 filterweights
 #for labels in lab
-lablabels <- read_excel("SSEMG_IS_20260224_label-table.xlsx",sheet = "lab_labels")
-fieldlabels <-read_excel("SSEMG_IS_20260224_label-table.xlsx",sheet = "field_labels")
+lablabels <- read_excel(datasheet, sheet = "lab_labels")
+fieldlabels <-read_excel(datasheet, sheet = "field_labels")
 
 ###########
 
@@ -65,7 +66,7 @@ library(kableExtra)
 
 
 #katie's example
-kable(labsheet, booktabs = FALSE) %>%
+kable(samplesheet, booktabs = FALSE) %>%
   kable_styling(latex_options = c("striped", "hold_position","repeat_header"), 
                 full_width = FALSE, 
                 font_size = 10) %>%

@@ -76,7 +76,6 @@ safe.write_csv <- function(x, path, ...) {
 
 #Adds random numbers to data frame
 
-
 datablank<- data.frame(site) %>%
   mutate(study=study,
          samp_type=samp_type,
@@ -84,8 +83,6 @@ datablank<- data.frame(site) %>%
          randomn= sample(rn:sn,sn, replace=F)
          ) 
 datablank
-
-
 
 #adds blank sample IDs, sample names, and adds text columns to fill out for date and time
 blanklabels <- datablank %>%
