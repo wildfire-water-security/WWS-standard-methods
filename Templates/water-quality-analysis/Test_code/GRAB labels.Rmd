@@ -12,6 +12,8 @@ Filling in pt 1 #this is for unique site names! #this one is assuming
 you are going to the field with blank times and will fill the dates into
 the generated spreadsheet use that to print lab labels
 
+## **Section 1- include sample information ([editable]{.underline}):**
+
 ```{r}
 ######### Filling in codes##########
 study <- "BDRK" #the study code
@@ -39,13 +41,11 @@ lab_file <-  "labsamples" #what to call header for lab label file
 
 #what format the files will end with. ex this returns:
 fileformat <- paste0(study,"_",samp_type,"_",sc,"_label-table.xlsx") 
-fileformat
 blank_fileformat <- paste0("blank_",study,"_",samp_type,"_",sc,"_label-table.csv") 
-blank_fileformat
 
 ```
 
-Libraries pt 2
+## **Section 2- run libraries:**
 
 ```{r}
 library(dplyr)
@@ -54,11 +54,13 @@ library(lubridate)
 library(writexl)
 ```
 
-pt 3
+## **Section 3- code:**
+
+Includes: total sample amount, and sample info, and functions to prevent
+overwrite files
 
 ```{r}
 sn <- nrow(site) #how many sites there are
-sn #each label sheet prints 30 samples
 
 #safewrite function 
 safe.write_xlsx <- function(x, path, ...) {
@@ -79,10 +81,17 @@ safe.write_csv <- function(x, path, ...) {
 } 
 ```
 
-pt 4 save file, save code do not re-run on second round! print the
-blanks off
+## **Section 4- code:**
 
-```{r}
+Saves a file that will be used to print off field labels. It will need
+to be edited later before printing lab data sheets and labels
+
+-   Remember to save your code
+
+-   Before proceeding to section 5, you will need to fill out the
+    created spreadsheet columns with the date and times
+
+```{r warning=TRUE}
 #Adds random numbers to data frame. Re-running will randomize them again!
 datablank<- data.frame(site) %>%
   mutate(study=study,
@@ -103,25 +112,30 @@ blank_labels <- datablank %>%
          #date_text_PST = rep('', nrow(datablank)), time_text_PST = rep('', nrow(datablank))) #adds column names to fill out could've been added in previous code section but I like it being on the far right for data entry. Do later?
 blank_labels 
 #print blank labels 
-print <- blank_labels %>% select(sample_name,field_sample_ID_blank,study,site,date_text_PST,time_text_PST) #reorder so it's easier for data entry
+print <- blank_labels %>% select(
+  sample_name,field_sample_ID_blank,randomn,study,samp_type,site,date_text_PST,time_text_PST) #reorder so it's easier for data entry
 safe.write_csv(print, blank_fileformat, row.names=FALSE)
 
-stop("Before printing lab labels out- fill out blank columns for date and time and print lab labels (as text only! example: for 2PST write 1400- make sure it's not PDT), save file.")
+stop("SAVE YOUR CODE.Before printing lab labels out- fill out blank columns for date and time and print lab labels (as text only! example: for 2PST write 1400- make sure it's not PDT), save file.")
 
 
 ```
 
-pt 5 before running this part, fill out the time_text column and save
-file rerun parts 1-3. IMPORTANT: DO NOT RUN PART 4 again. If you do,
-clear the workspace and try again
+## **Section 5 - code**
 
-```{r, edit}
+Before running this part:
+
+-   fill out the time_text column and save file
+
+-   rerun sections 1-3. Do [not]{.underline} rerun section 4
+
+```{r edit, warning=TRUE}
 datalabels <- read.csv(blank_fileformat) #bring in the saved data labels. 
 datalabels
-stop("check that date_text and time_text rows were filled out in the consol")
+stop("check that date_text and time_text rows were filled out before proceeding")
 ```
 
-pt 6
+## **Section 6:**
 
 ```{r}
 #make datetimes and the sampleID with times
@@ -142,7 +156,7 @@ datasortlab <- data[order(data$randomn),]
 datasortlab #use this to print datasheets out
 ```
 
-pt 7
+## **Section 7:**
 
 ```{r}
 #add analytes that are TRUE
@@ -178,7 +192,7 @@ mutate(datacodes,
 labdata
 ```
 
-printing
+## **Section 8- printing:**
 
 ```{r}
 write_data.frames <- list(

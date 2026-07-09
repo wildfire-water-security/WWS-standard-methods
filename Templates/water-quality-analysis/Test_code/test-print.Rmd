@@ -18,7 +18,7 @@ library(readxl)
 
 ```{r import data, include=FALSE}
 datasheet <- "SSEMG_IS_20260223_label-table.xlsx" #fill in
-
+#delete the bot_num??? Keep for bottle weight??
 ```
 
 ```{r datasheets,include=FALSE}
@@ -27,16 +27,16 @@ datasheet <- "SSEMG_IS_20260223_label-table.xlsx" #fill in
 #for note sheets
 labsheet <- read_excel(datasheet, sheet ="lab_filter_sheets")
 labsheet
-labsheets <- data.frame(labsheet)
-labsheets
 #for ISCO weights
-sample_weights <- mutate(labsheets, pre_weight="", post_weight="",notes="")
-sample_weights
+bottle_weights <- mutate(labsheet,pre_weight="", post_weight="",notes="")
+bottle_weights
 #for filtering
 sample_bottles <- mutate(labsheet, Aqualog = "",Shimadzu = "", CCAL ="",Levoglucosan="",Excess="",notes="") #not sure how to do automatically without something janky
 sample_bottles
 #for filtering 
 filter_weights <- mutate(labsheet,pre_weight="", post_weight="",notes="")
+  # subset(labsheet, select = -botnum)%>%
+  # mutate(pre_weight="", post_weight="",notes="")
 filter_weights
 
 
@@ -50,16 +50,21 @@ Date: \_\_\_\_\_\_\_\_\_\_\_\_\_
 
 Technician(s): \_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
+
 ```{r bottle weights, echo=FALSE}
-#knitr::kable(sample_weights,booktabs=TRUE, vline = "|",linesep = '') #this does NOTHING. Wanted to add vertical lines and get rid of the line breaks every 5 rows
-kable(sample_weights,booktabs=FALSE) %>%
-  kable_styling(latex_options = c("striped","left","repeat_header"),
+#knitr::kable(bottle_weights,booktabs=TRUE, vline = "|",linesep = '') #this does NOTHING. Wanted to add vertical lines and get rid of the line breaks every 5 rows
+kable(bottle_weights,booktabs=FALSE) %>%
+  kable_styling(latex_options = c("striped","hold_position","repeat_header"),
                 full_width = FALSE,
                 font_size = 10) %>%
-  row_spec(0, bold = TRUE, color = "black", background = "#FFF7B0")%>%
-  column_spec(ncol(sample_weights), width= "15em") #widen the last row (notes)
+  row_spec(0, bold = TRUE, color = "black", background = "#FFF7B0") %>%
+  column_spec(1:ncol(bottle_weights),border_left = T)  %>% #adding vertical lines
+  column_spec(ncol(bottle_weights), width= "15em",border_left = T, border_right = T)#widen the last row (notes) and add a vertical line 
+  
+ 
 
 ```
+
 
 \newpage
 
@@ -74,7 +79,7 @@ Technician(s): \_\_\_\_\_\_\_\_\_\_\_\_\_\_
 
 ```{r sample bottle numbers, echo=FALSE}
 kable(sample_bottles,booktabs=FALSE) %>%
-  kable_styling(latex_options = c("striped", "left","repeat_header"), #"hold_position"
+  kable_styling(latex_options = c("striped", "hold_position","repeat_header"),
                 full_width = FALSE,
                 font_size = 10) %>%
    row_spec(0, bold = TRUE, color = "black", background = "#CDFFB0") %>%
