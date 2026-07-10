@@ -51,6 +51,7 @@ library(dplyr)
 library(stringr)
 library(lubridate)
 library(writexl)
+source("helper-fun.R")
 ```
 
 ## **Section 3- code:**
@@ -64,23 +65,7 @@ sn <- sum(nsamp) #total sample amount from the vector that was filled out
 sampleinfo <- data.frame(site=site,nsamp=nsamp,start=start,interval=interval,study=study,samp_type=samp_type,blanktime=blanktime) #all sample info for the function
 #would need to alter if it includes grabs 
 
-# Functions to safely write slsxs and csvs without overwriting anything
-safe.write_xlsx <- function(x, path, ...) {
-  if(file.exists(path)) {
-    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
-         "We don't want to overwrite randomized sample names\n",
-         "Check ", path, " to see if the already written file is ok.")
-  }
-  write_xlsx(x, path, ...)
-}
-safe.write_csv <- function(x, path, ...) {
-  if(file.exists(path)) {
-    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
-         "We don't want to overwrite randomized sample names\n",
-         "Check ", path, " to see if the already written file is ok.")
-  }
-  write.csv(x, path, ...)
-} #had to add this because couldn't get blank files to work wth xlsx
+
 ```
 
 ## **Section 4- code:**
@@ -90,6 +75,8 @@ Creates data frame for the labels
 -   Re-running the code will re-randomize the random numbers, so that's why there are overwrite warnings for the spreadsheets
 
 -   Will save a csv file for blank time samples
+
+-   Remember to save your code if you have blank samples
 
 ```{r code pt 2, warning=TRUE, include=FALSE}
 #function to fill out site, study, sample type, time stamps, and bottle numbers
