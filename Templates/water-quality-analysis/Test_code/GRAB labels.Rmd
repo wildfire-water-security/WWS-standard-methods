@@ -19,7 +19,7 @@ the generated spreadsheet use that to print lab labels
 study <- "BDRK" #the study code
 samp_type <- "GB" #(GB,IS, SS, etc.)
 rn <- 1 #the start of a random number sequence. May change with projects or studies
-site <- read.csv("example_sites.csv") #import your site list. This file needs to have the header "site"
+site <- read.csv("Templates/water-quality-analysis/Test_code/example_sites.csv") #import your site list. This file needs to have the header "site"
 #not sure how to do this without a specific header...
 site
 blank_time <- "____________" #either have it blank or with sampling date "____________" or "YYYYMMDD____"

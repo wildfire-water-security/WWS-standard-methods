@@ -1,0 +1,112 @@
+---
+title: "Water Quality Labels and Datasheets"
+author: "Emily Nussdorfer"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Input Sampling Info
+
+## Study and Site Info
+
+-   **`study`:** 4-5 letter code associated with the study
+-   **`samp_type:`** type of sample being collected
+    -   `GB`: Grab samples
+    -   `IS`: ISCO samples
+    -   `SS`: Soil sample (!!!! I can't remember if this is what SS was for)
+-   **`rn`:** The number to start the random number sequence
+
+```{r study-info}
+study <- "BDRK"
+samp_type <- "GB"
+rn <- 1
+```
+
+## Sampling Info
+
+### Grab Samples
+
+-   **`site`:** file path to a `.csv` of site names where the first column is the site names.
+
+    !!!! instead of leaving read.csv() here I'd incorporate it into the function (less code for people to mess up).
+
+-   **`blank_time`:** Either a line for a fully blank label or a date followed by a line for the time (ie. `"YYYYMMDD____"`)
+
+```{r grab-sample-info}
+if(samp_type == "GB"){
+  site <- "example_sites.csv"
+  blank_time <- "____________" 
+}
+```
+
+### ISCO Samples
+
+```{r isco-sample-info}
+if(samp_type == "IS"){
+site <- c("STA","COA") #sites as a vector
+nsamp <- c(24,24) #amount of samples per site. Matches the site vector above.
+interval <- c(2,2) #interval of sampling ISCO is programmed for, usually 2hrs
+sc <- "20260223" #what sample campaign this is, the date it starts "YYYYMMDD" or something like sample_campaign-#. This is for file name purposes 
+knowntime <- FALSE #fill TRUE When you have a time start and FALSE for if you don't know the time start. Knowing the time is the most efficient method.Important for If statements.  
+#fill if you have known time:
+start <- c("2026-02-23 15:00","2026-02-23 17:00")
+#fill if you don't know time:
+blanktime <- "____________" # either have it blank  "____________" or with sampling date "YYYYMMDD____" or "YYYYMM______", etc
+
+}
+
+```
+
+## Analysis Info
+
+Logical for which analysis will be performed on the samples:
+
+-   **`DOM`:** dissolved organic matter composition on the Aqualog
+-   **`DOC`:** dissolved organic carbon on the Shimadzu
+-   **`CCAL`:** additional analytes sent to outside labs
+-   **`Levoglucosan`:** levoglucosan to be archived for future analysis
+-   **`Excess`:** additional sample collected for other purposes (ie., sending to Node 3)
+
+```{r analysis-info}
+DOM <- TRUE
+DOC <- TRUE
+CCAL <- FALSE
+Levoglucosan <- TRUE
+Excess <- FALSE
+```
+
+## Export Location
+
+Specify where to export the spreadsheet with the sample names and datasheets.
+
+**`saveloc`:** the filepath to the location to save the excel file to.
+
+!!!! I think it's fine to set a standard file name and just put in the file location. Also if there are concerns about overwriting, you could just write the filename with the datetime using sys.time() so you wouldn't overwrite.
+
+!!! with markdown the default is that the wd is the same as where the markdown is, however, I find that super annoying and changed R settings so it's the project. which means that by default these files write out to the root directory. would suggest changing to have user specify file location and then use file.path(saveloc, filename) to save the file.
+
+```{r export-info}
+saveloc <- get_wd() 
+```
+
+```{r generate-ids include=FALSE}
+set.seed(9) #!!! this will keep the randomization the same each time the code is run. 
+
+# !!!! cal function to generate ids here (section 4)
+# !!! write to excel template (Sample-DateTime)
+```
+
+```{r create-labels include=FALSE}
+# !!!! check for if datetimes are in spreadsheet, if yes run otherwise don't 
+# section 6-8 here
+# !!! write to excel template (Labels-Field & Labels-Lab)
+```
+
+```{r create-datasheets include=FALSE}
+# !!!! check for if datetimes are in spreadsheet, if yes run otherwise don't 
+# !!! write to excel template (DS-Filter Weight, DS-Bottle Numbers, DS-ISCO Bottle Weight)
+```
