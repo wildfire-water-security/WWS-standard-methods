@@ -45,45 +45,18 @@ Excess <- TRUE
 fileformat <- paste0(study,"_",samp_type,"_",sc,"_label-table.xlsx") #the file name
 blank_fileformat <- paste0("blank_",study,"_",samp_type,"_",sc,"_label-table.csv") 
  
-field_blank <- TRUE
-lab_blank <- TRUE
+# field_blank <- TRUE
+# lab_blank <- TRUE
 nFB <- 1
 nLB <- 1
+blk <-c(nFB,nLB)
 
 
-```
+blanks <- data.frame(
+  site=c("FB","LB")
+)
 
-```{r}
-# Functions to safely write slsxs and csvs without overwriting anything
-safe.write_xlsx <- function(x, path, ...) {
-  if(file.exists(path)) {
-    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
-         "We don't want to overwrite randomized sample names\n",
-         "Check ", path, " to see if the already written file is ok.")
-  }
-  write_xlsx(x, path, ...)
-}
-
-
-#' Title
-#' 
-#' Description here
-#'
-#' @param x 
-#' @param path 
-#' @param ... 
-#'
-#' @returns
-#'
-safe.write_csv <- function(x, path, ...) {
-  if(file.exists(path)) {
-    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
-         "We don't want to overwrite randomized sample names\n",
-         "Check ", path, " to see if the already written file is ok.")
-  }
-  write.csv(x, path, ...)
-} #had to add this because couldn't get blank files to work wth xlsx
-
+blanks
 
 
 
@@ -93,8 +66,11 @@ safe.write_csv <- function(x, path, ...) {
 ```{r}
 sn <- sum(nsamp) #total sample amount from the vector that was filled out
 #adding sample information
-sampleinfo <- data.frame(site=site,nsamp=nsamp,interval=interval,study=study,samp_type=samp_type,blanktime=blanktime)
+
 pt2 <- FALSE
+
+#sampleinfo <- data.frame(site=site,nsamp=nsamp,interval=interval,study=study,samp_type=samp_type,blanktime=blanktime, sn=sn, rn=rn)
+#function
 ```
 
 
@@ -107,91 +83,81 @@ library(dplyr)
 library(stringr)
 library(lubridate)
 library(writexl)
-#source("helper-fun.R")
+source("helper_unknown.R")
 ```
 
-## **Section 3- code:**
 
-Includes: total sample amount, and sample info, and functions to prevent overwrite files
 ```{r}
-#FOR ISCO UNKNOWN
-
-  #add sample names and IDs
 
 
-data_label_final <- function(sampleinfo){
-data_label <- function(sampleinfo){
-    return(data.frame(site =rep(sampleinfo$site, times = sampleinfo$nsamp),
-                      blank_time=sampleinfo$blanktime,
-                      botnum = sprintf("%02d",rep(1:24, times= ceiling(sampleinfo$nsamp/24))[1:sampleinfo$nsamp]), study=sampleinfo$study,samp_type=sampleinfo$samp_type))
-}
-data_table <- lapply(1:nrow(sampleinfo),function(x){data_label(sampleinfo[x,])})%>%
-bind_rows()
-
-
-return(
-  data.frame
-  randomn=sample(rn:sn,sn, replace=F),
-  sample_name = paste0( study, "_", "R", sprintf("%04d",randomn)),
-  field_sample_ID_blank= paste0(study, "_", site, "_", samp_type,"_",blanktime))
-)
+#if BLANKS == TRUE
+#function 1  
+data_label <- function(){
+  sampleinfo <- data.frame(site=site,nsamp=nsamp,interval=interval,study=study,samp_type=samp_type,blanktime=blanktime, sn=sn, rn=rn)
+  data_info <- function(sampleinfo){ #this function creates 
+    return(data.frame(
+      site =rep(sampleinfo$site, times = sampleinfo$nsamp),
+      blank_time=sampleinfo$blanktime,
+      botnum = sprintf("%02d",rep(1:24, times= ceiling(sampleinfo$nsamp/24))[1:sampleinfo$nsamp]),
+      study=sampleinfo$study,samp_type=sampleinfo$samp_type
+    ))}
+  x<-lapply(1:nrow(sampleinfo),function(x){data_info(sampleinfo[x,])})%>%
+    bind_rows()%>%
+    mutate(
+      randomn=sample(rn:sn,sn, replace=F),
+      sample_name = paste0(study, "_", "R", sprintf("%04d",randomn)),
+      field_sample_ID_blank= paste0(study, "_", site, "_", samp_type,"_",blanktime))
 }
 
-# data_label <- function(sampleinfo){
-#     return(data.frame(site =rep(sampleinfo$site, times = sampleinfo$nsamp),
-#                       blank_time=sampleinfo$blanktime,
-#                       botnum = sprintf("%02d",rep(1:24, times= ceiling(sampleinfo$nsamp/24))[1:sampleinfo$nsamp]), study=sampleinfo$study,samp_type=sampleinfo$samp_type))
-#   }
 
-randomn<-sample(rn:sn,sn, replace=F)
-#where to add????
-```
 
-```{r pt 1, include=FALSE}
 
-data_table <- lapply(1:nrow(sampleinfo),function(x){data_label(sampleinfo[x,])})%>%
-bind_rows()%>%
-mutate(
-  randomn=sample(rn:sn,sn, replace=F),
-  sample_name = paste0( study, "_", "R", sprintf("%04d",randomn)),
-  field_sample_ID_blank= paste0(study, "_", site, "_", samp_type,"_",blanktime)
-  )
 
-data_names <- function(x){
-  data<-x%>%
-mutate(
-  randomn=sample(rn:sn,sn, replace=F),
-  sample_name = paste0( study, "_", "R", sprintf("%04d",randomn)),
-  field_sample_ID_blank= paste0(study, "_", site, "_", samp_type,"_",blanktime)
-  )
 
-}
 
-data_table <- lapply(1:nrow(sampleinfo),function(x){data_names(sampleinfo[x,])})%>%
-bind_rows()#%>%
+# lab_blank <- TRUE
+nFB <- 1
+nLB <- 1
+blk <-c(nFB,nLB)
+bn <- sum(nFB,nLB)
+ts <- sum(sn,bn)
 
-data_table
-#this prints your data labels out if you have blank samples, since you will need to rerun this code again. 
-#  safe.write_csv(data_table,
-#                  path = blank_fileformat,
-#                  row.names = FALSE)
-# stop("DO NOT CONTINUE UNTIL YOU HAVE YOUR TIMES. SAVE YOUR CODE")
+#somehow append this shit 
+blanks <- data.frame(
+  site=c("FB","LB"),
+  blank_time = c("____________","____________"),
+  type= c("BLK","BLK"))
+
+blanks
+
 
 
 
 ```
 
-## **Section 5 - code** (for [blank times only]{.underline}):
 
-*Note: can skip to section 6 if you have known times. It won't do anything for known time samples so running won't hurt*
+```{r part 1 of code}
 
-Follow if you had blank times (this won't do anything for known times):
+#main file
+data_table<-data_label()
 
--   Do not change any of the above sections (leave known time FALSE)
+```
 
--   Re-run sections 1-3 only
 
--   Fill the times and run code below ([editable]{.underline}):
+
+
+```{r}
+#this prints your data labels out if you have blank samples, since you will need to rerun this code again.
+safe.write_csv(data_table,
+                 path = blank_fileformat,
+                 row.names = FALSE)
+stop("DO NOT CONTINUE UNTIL YOU HAVE YOUR TIMES. SAVE YOUR CODE") #ad to function
+
+```
+
+
+
+#code
 
 ```{r pt 5: and run, include=FALSE}
 #enter the known start times on the ISCO (look at section 1 to match it to the correct site order)
@@ -203,102 +169,32 @@ pt2 <- TRUE
 
 ```{r pt 5: just run it, include=FALSE}
 
-sampletimeinfo <- data.frame(nsamp=nsamp,interval=interval,start=start,
-                             DOC=DOC,DOM=DOM,CCAL=CCAL,Levoglucosan=Levoglucosan, Excess=Excess)   
-
-    site_label_blank <- function(sampletimeinfo){
-      timestart <- as.POSIXct(sampletimeinfo$start)
-      timelist <- seq(timestart, by=paste0(sampletimeinfo$interval, " hours"), length = sampletimeinfo$nsamp)
-      # field_sample_ID <- paste0(study, "_", site, "_",samp_type,"_",datetime_PST)
-      
-      return(
-        data.frame(time_PST=as.character(timelist),datetime_PST=format(timelist,"%Y%m%d%_%H%M"))
-        #imports file using previous file naming#add sample Ids with time
-       )
-
-      }
-
-# blank <- read.csv(blank_fileformat)
-# blank
-# %>%
-#         mutate(field_sample_ID = paste0(study, "_",
-#                                         site, "_",
-#                                         samp_type,"_",
-#                                         datetime_PST))%>%
-#         cross_join(read.csv(blank_fileformat))
-
-#make a data frame with times
-data_labels <- lapply(1:nrow(sampletimeinfo),function(x){site_label_blank(sampletimeinfo[x,])}) %>% #makes the frame
-  bind_rows()
-data_labels
-```
-
-## **Section 6- adding lab analytes:**
-
-```{r include=FALSE}
-
-
-
-sampleinfo2 <- data.frame(site=site,nsamp=nsamp,start=start,interval=interval,study=study,samp_type=samp_type,blanktime=blanktime,DOC=DOC,DOM=DOM,CCAL=CCAL,Levoglucosan=Levoglucosan, Excess=Excess)
-
-#sort the data by the randomn, since they should be filtered that way
-datasortlab <- data_labels[order(data_labels$randomn),]
-datasortlab #use this to print datasheets out
-
-
-
-
-#adding in processing information:
-#add analytes that are TRUE
-analysis_opt <- c("CN", "AQ", "NU", "LV", "EX")
-analysis_choice <- c(DOC, DOM, CCAL, Levoglucosan, Excess)
-
-analysiscodes <- analysis_opt[analysis_choice]
-analysiscodes
-analysisn <- length(analysiscodes) #how many analytes there are
-samples <- analysisn*sn #how many total filtered samples there will be
-
-datacodes<- data.frame(code = rep(analysiscodes,times=sn)) %>% #add labcodes
-  mutate(analysis = case_when(
-    code == "CN" ~ "Shimadzu",
-    code == "AQ" ~ "Aqualog",
-    code == "NU" ~ "CCAL",
-    code == "LV" ~ "Levoglucosan",
-    code == "EX" ~ "Excess",
-    TRUE ~ NA_character_
-  ))
-datacodes
-
-
-#repeat sample rows for each analysis
-lab_data <- datasortlab %>% slice(rep(1:n(), each = analysisn)) %>%
-  mutate(datacodes,
-         lab_sample_ID =
-           paste0(field_sample_ID, "_", datacodes$code ))
-print(lab_data)
-
-
-labfunction <- function(
     
-  
-  
-  
-  
-    )
+data_lab<-lab_label()
+
 
 
 ```
+
 
 ## Section 7- printing:
 
 ```{r warning=TRUE}
 
-write_data.frames <- list(
-  # field_labels = data_labels %>% select(sample_name,field_sample_ID,botnum),
-  lab_labels   = lab_data %>% select(sample_name,lab_sample_ID,analysis),
-  lab_filter_sheets = data_labels[order(data_labels$randomn),] %>% select(sample_name,field_sample_ID),
-  label_metadata = data_labels %>% select(site,datetime_PST,study,samp_type,randomn,botnum) #could delete this one  
-)
-safe.write_xlsx(write_data.frames,
-                path = fileformat)
+
+
+
+
+
+
+
+
+# write_data.frames <- list(
+#   # field_labels = data_labels %>% select(sample_name,field_sample_ID,botnum),
+#   lab_labels   = lab_data %>% select(sample_name,lab_sample_ID,analysis),
+#   lab_filter_sheets = data_labels[order(data_labels$randomn),] %>% select(sample_name,field_sample_ID),
+#   label_metadata = data_labels %>% select(site,datetime_PST,study,samp_type,randomn,botnum) #could delete this one
+# )
+# safe.write_xlsx(write_data.frames,
+#                 path = fileformat)
 ```
