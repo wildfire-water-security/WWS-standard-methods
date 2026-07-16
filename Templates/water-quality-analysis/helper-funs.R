@@ -37,7 +37,9 @@ generateids <- function(sites){}
 #' @param saveloc File path where file should be saved, including file name.
 #' @param type Character specifying the info to enter into template. Either
 #' "datetime", "lablabel", "fieldlabel", or "datasheet".
+#' @param samptype Character specifying the sample type. Either "isco" or "grab".
 #' @param open Logical, should excel file be opened on running?
+#' @param overwrite Logical, should existing template be overwritten?
 #' @md
 #' @details
 #' If `type` is
@@ -45,6 +47,8 @@ generateids <- function(sites){}
 #'  - Sample ID
 #'  - Sample Name
 #'  - Site
+#'  - Random ID
+#'  - Bottle Number (will be blank for grab)
 #'  - Date (may be blank)
 #'  - Time (may be blank)
 #' - "lablabel" df should have three columns:
@@ -57,54 +61,89 @@ generateids <- function(sites){}
 #'  - Analysis
 #' - "datasheet" no df is needed, but dates and times should be filled out
 #' @returns Writes an `.xlsx` file to save location and opens up the file in excel.
+#' @examples
+#' df <- read.csv("Templates/water-quality-analysis/examples/Blank_IS.csv")
+#' saveloc <- "Templates/water-quality-analysis/example-template-is.xlsx"
+#' create_datasheets(df, saveloc, "isco", "datetime", open=FALSE, overwrite=TRUE)
+#' df <- read_xlsx("Templates/water-quality-analysis/examples/Final_IS.xlsx", sheet="field_labels")
+#' create_datasheets(df, saveloc, "isco", "fieldlabel", open=FALSE)
+#' df <- read_xlsx("Templates/water-quality-analysis/examples/Final_IS.xlsx", sheet="lab_labels")
+#' create_datasheets(df, saveloc, "isco", "lablabel", open=FALSE)
+#' create_datasheets(df, saveloc, "isco", "datasheet", open=TRUE)
 
-create_datasheets <- function(df, saveloc, type, open=FALSE){
-  stopifnot(type %in% c("datetime", "fieldlabel", "lablabel", "datasheet"))
+#' saveloc <- "Templates/water-quality-analysis/example-template-gb.xlsx"
+#' df <- read.csv("Templates/water-quality-analysis/examples/Blank_GB.csv")
+#' create_datasheets(df, saveloc, "grab", "datetime", open=FALSE, overwrite=FALSE)
+#' #df <- read_xlsx("Templates/water-quality-analysis/examples/Final_GB.xlsx", sheet="field_labels")
+#' #create_datasheets(df, saveloc, "grab", "fieldlabel", open=FALSE)
+#' df <- read_xlsx("Templates/water-quality-analysis/examples/Final_GB.xlsx", sheet="lab_labels")
+#' create_datasheets(df, saveloc, "grab", "lablabel", open=FALSE)
+#' create_datasheets(df, saveloc, "grab", "datasheet", open=TRUE)
 
-  #locate template
-    template <- list.files(getwd(), pattern = "^wqsample-label-datasheet-templates[.]xlsx", full.names = TRUE, recursive = TRUE)
-    if(length(template) == 0){
-      #download from github as a backup
-      template <- "https://github.com/wildfire-water-security/WWS-standard-methods/raw/refs/heads/main/Templates/water-quality-analysis/wqsample-label-datasheet-templates.xlsx"
+create_datasheets <- function(df, saveloc, samptype, type, open=FALSE, overwrite=FALSE){
+  stopifnot(type %in% c("datetime", "fieldlabel", "lablabel", "datasheet"),
+            samptype %in% c("isco", "grab"))
+
+  #locate template/workbook
+    if(file.exists(saveloc) & !overwrite){
+      #load existing workbook
+      path <- saveloc
+
+    }else{
+      #get template
+      path <- list.files(getwd(), pattern = "^wqsample-label-datasheet-templates[.]xlsx", full.names = TRUE, recursive = TRUE)
+      if(length(path) == 0){
+        #download from github as a backup
+        path <- "https://github.com/wildfire-water-security/WWS-standard-methods/raw/refs/heads/main/Templates/water-quality-analysis/wqsample-label-datasheet-templates.xlsx"
+      }
     }
 
   #read in template
-    tab <- wb_load(template)
+    tab <- wb_load(path)
 
   #add datetime
     if(type == "datetime"){
-      #check to see if it was empty, if yes, don't overwrite user added info
-      if(all(is.na(site_df$datetext_PST)) & all(is.na(site_df$time_text_PST))){
-        site_df <- site_df %>% select(-c(datetext_PST, time_text_PST))
-      }
-
-      tab <- tab %>% wb_add_data(sheet= "Sample-DateTime", x=site_df, dims="A2")
+      if(samptype == "isco"){
+        df <- df %>% mutate(date_text_PST="", time_text_PST="",.after=botnum)}
+      if(samptype == "grab"){
+        df <- df %>% mutate(botnum="N/A", .before=randomn)}
+      site_df <- df %>% select(c("sample_name", "field_sample_ID_blank",
+                                 "site", "botnum","randomn", "date_text_PST", "time_text_PST"))
+      #don't overwrite dates/times
+      exist_data <- tab %>% wb_to_df(sheet="Sample-DateTime")
+      if(any(!is.na(exist_data$`Date (YYYYMMDD)`)) | any(!is.na(exist_data$`Time (HHMM)`))){
+           site_df <- site_df %>% select(-c(date_text_PST, time_text_PST))
+         }
+      tab <- tab %>% wb_add_data(sheet= "Sample-DateTime",
+                                 x=site_df, dims="A2",col_names = FALSE)
     }
 
   #add labels
     if(type == "lablabel"){
-      tab <- tab %>% wb_add_data(sheet= "Labels-Lab", x= site_df, dims="A2")
+      tab <- tab %>% wb_add_data(sheet= "Labels-Lab", x= df, dims="A2", col_names=FALSE)
     }
 
     if(type == "fieldlabel"){
-      tab <- tab %>% wb_add_data(sheet= "Labels-Field", x= site_df, dims="A2")
+      tab <- tab %>% wb_add_data(sheet= "Labels-Field", x= df, dims="A2", col_names=FALSE)
     }
 
   #add datasheets
     if(type == "datasheet"){
-      ids <- tab %>% wb_to_df(sheet="Sample-DateTime") %>% select('Sample Name', 'Sample ID')
-      datasheets <- datasheets %>% wb_add_data(sheet= "DS-Bottle Numbers", dims="A3", x=ids)
-      datasheets <- datasheets %>% wb_add_data(sheet= "DS-ISCO Bottle Weight", dims="A3", x=ids)
-      datasheets <- datasheets %>% wb_add_data(sheet= "DS-Filter Weight", dims="A3", x=ids)
+      ids <- tab %>% wb_to_df(sheet="Sample-DateTime") %>% select('Sample ID','Sample Name') %>% arrange(`Sample ID`)
+      tab <- tab %>% wb_add_data(sheet= "DS-Bottle Numbers", dims="A3", x=ids, col_names=FALSE)
+      tab <- tab %>% wb_add_data(sheet= "DS-ISCO Bottle Weight", dims="A3", x=ids, col_names=FALSE)
+      tab <- tab %>% wb_add_data(sheet= "DS-Filter Weight", dims="A3", x=ids, col_names=FALSE)
     }
 
   #save
-    wb_save(tab, savloc)
-    print(paste0("information populated and saved to:\n", save_loc))
+    wb_save(tab, file=saveloc)
+
 
   #open if requested
     if(open){
-      wb_open(tab)
+      shell.exec(file.path(getwd(), saveloc))
+    }else{
+      cat(paste0("information populated and saved to:\n", saveloc))
     }
 
 
