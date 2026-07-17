@@ -37,16 +37,27 @@ Excess <- TRUE
 
 
 
-```{r messing about}
+```{r blank tests}
 
 
 nLB <- 2 #number of lab/procedural blanks being used. 
 nFB <- 0 #number of field blanks being used. will probably need to add a description for where it was grabbed. 
+
+# FBLK1 generated
+# LBLK1 generated
+
+
+
+
+
+
+
 blk <-c(nLB,nFB)
 bn <- sum(nLB,nFB)
 ts <- sum(sn,bn)
 blks <- c("LB","FB")
-#somehow append this shit 
+
+
 blanks <- data.frame(
   name=rep(blks, times =blk),
   num = c(seq(from = 1, by = 1, length.out = nLB),seq(from = 1, by = 1, length.out = nFB)),
@@ -69,8 +80,8 @@ data_label_w_blanks <- function(){
       study=sampleinfo$study,samp_type=sampleinfo$samp_type
     ))}
   x<-lapply(1:nrow(sampleinfo),function(x){data_info(sampleinfo[x,])})%>%
-    bind_rows()%>% #updated to add blanks here 
-    bind_rows(blanks)%>%
+    bind_rows()%>% #might be able to combine 
+    bind_rows(blanks)%>% #updated to add blanks here 
     mutate(
       randomn=sample(rn:ts,ts, replace=F), # need to use total sample number 
       sample_name = paste0(study, "_", "R", sprintf("%04d",randomn)),

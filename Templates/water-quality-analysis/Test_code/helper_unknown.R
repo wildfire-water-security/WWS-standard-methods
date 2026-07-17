@@ -37,12 +37,12 @@ safe.write_csv <- function(x, path, ...) {
 
 
 
-#functions for data labels 
+
 
 
 sn <- sum(nsamp) #total sample amount from the vector that was filled out
 
-
+#functions for data labels 
 
 #first function   
 data_label <- function(){
