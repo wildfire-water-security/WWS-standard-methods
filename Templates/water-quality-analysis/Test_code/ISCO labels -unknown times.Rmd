@@ -76,6 +76,7 @@ data_label_w_blanks <- function(){
     return(data.frame(
       site =rep(sampleinfo$site, times = sampleinfo$nsamp),
       blank_time=sampleinfo$blanktime,
+      
       botnum = sprintf("%02d",rep(1:24, times= ceiling(sampleinfo$nsamp/24))[1:sampleinfo$nsamp]),
       study=sampleinfo$study,samp_type=sampleinfo$samp_type
     ))}
