@@ -130,9 +130,27 @@ create_datasheets <- function(df, saveloc, samptype, type, open=FALSE, overwrite
   #add datasheets
     if(type == "datasheet"){
       ids <- tab %>% wb_to_df(sheet="Sample-DateTime") %>% select('Sample ID','Sample Name') %>% arrange(`Sample ID`)
-      tab <- tab %>% wb_add_data(sheet= "DS-Bottle Numbers", dims="A3", x=ids, col_names=FALSE)
-      tab <- tab %>% wb_add_data(sheet= "DS-ISCO Bottle Weight", dims="A3", x=ids, col_names=FALSE)
-      tab <- tab %>% wb_add_data(sheet= "DS-Filter Weight", dims="A3", x=ids, col_names=FALSE)
+
+      rows <- nrow(ids) #number of formatted lines we need #formatting in table goes to 500
+
+      #prepare bottle numbers df
+      n_page <- ceiling(rows / 37)
+      clear <- (n_page*38 + 1)
+      tab <- tab %>% wb_add_data(sheet= "DS-Bottle Numbers", dims="A3", x=ids, col_names=FALSE) %>%  #36/38 per page
+        wb_clean_sheet(dims = paste0("A", clear, ":G500"))
+
+      #prepare bottle weight df
+      n_page <- ceiling(rows / 52)
+      clear <- (n_page*53 + 1)
+      tab <- tab %>% wb_add_data(sheet= "DS-ISCO Bottle Weight", dims="A3", x=ids, col_names=FALSE) %>% #51/53 per page
+        wb_clean_sheet(dims = paste0("A", clear, ":G500"))
+
+      #prepare filter weight df
+      n_page <- ceiling(rows / 53)
+      clear <- (n_page*54 + 1)
+      tab <- tab %>% wb_add_data(sheet= "DS-Filter Weight", dims="A3", x=ids, col_names=FALSE) %>% #52/54 per page
+        wb_clean_sheet(dims = paste0("A", clear, ":G500"))
+
     }
 
   #save
