@@ -1,0 +1,119 @@
+---
+title: "ISCO-known-labels"
+author: "Emily Nussdorfer"
+date: "2026-07-13"
+output: html_document
+---
+```{r sample info, include=FALSE}
+
+#sample information:
+study <- "SSEMG" #the study code
+samp_type <- "IS" #"IS" = ISCO
+rn <- 1 #the start of a random number sequence. May change with projects or studies
+site <- c("STA","COA") #sites as a vector
+nsamp <- c(24,24) #amount of samples per site. Matches the site vector above.
+interval <- c(2,2) #interval of sampling ISCO is programmed for, usually 2hrs
+sc <- "20260223" #what sample campaign this is, the date it starts "YYYYMMDD" or something like sample_campaign-#. This is for file name purposes and doesn't effect sample naming
+
+#sample times:
+knowntime <- FALSE #fill TRUE When you have a time start and FALSE for if you don't know the time start. Knowing the time is the most efficient method.Important for If statements.  
+#fill if you have known time:
+start <- c("2026-02-23 15:00","2026-02-23 17:00")
+#fill if you don't know time:
+
+#analysis, fill TRUE if using them, FALSE if not:
+DOM <- TRUE
+DOC <- TRUE
+CCAL <- TRUE
+Levoglucosan <- TRUE
+Excess <- TRUE
+
+#optional change:
+#can add a folder here if desired
+#what format the files will end with. ex this returns: study_sapmpletype_date_label-table 
+fileformat <- paste0(study,"_",samp_type,"_",sc,"_label-table.xlsx") #the file name
+blank_fileformat <- paste0("blank_",study,"_",samp_type,"_",sc,"_label-table.csv") 
+ 
+
+```
+
+
+```{r libraries, include=FALSE}
+library(dplyr)
+library(stringr)
+library(lubridate)
+library(writexl)
+#source("helper-fun.R")
+```
+
+
+
+
+```{r}
+#function   
+
+data_labels <- function(){
+  sn <- sum(nsamp) #total sample amount from the vector that was filled out
+  sampleinfo <- data.frame(nsamp=nsamp,interval=interval,start=start,DOC=DOC,DOM=DOM,CCAL=CCAL,Levoglucosan=Levoglucosan,Excess=Excess)  
+data_label <- function(){
+  #makes data frame
+  sn <- sum(nsamp) #total sample amount from the vector that was filled out
+  sampleinfo <- data.frame(site=site,nsamp=nsamp,interval=interval,study=study,samp_type=samp_type,start=start, sn=sn, rn=rn)
+  data_info <- function(sampleinfo){ #this function creates
+    sitelist <- rep(sampleinfo$site, times = sampleinfo$nsamp)
+    timestart <- as.POSIXct(sampleinfo$start)
+    timelist <- seq(timestart, by=paste0(sampleinfo$interval, " hours"), length = sampleinfo$nsamp)
+    botnum <- rep(1:24, times= ceiling(sampleinfo$nsamp/24))[1:sampleinfo$nsamp] 
+    
+    return(data.frame(site =sitelist, timelist=timelist, 
+                      botnum = sprintf("%02d",botnum), 
+                      study=sampleinfo$study,
+                      samp_type=sampleinfo$samp_type,
+                      datetime_PST=format(timelist,"%Y%m%d%_%H%M")
+    ))}
+  #adds sample name and IDs and random numbers
+  return(lapply(1:nrow(sampleinfo),function(x){data_info(sampleinfo[x,])})%>%
+    bind_rows()%>%
+    mutate(
+      randomn=sample(rn:sn,sn, replace=F),
+      sample_name = paste0(study, "_", "R", sprintf("%04d",randomn)),
+      field_sample_ID_blank= paste0(study, "_", site, "_", samp_type,"_",datetime_PST)))}
+
+  analysis_opt <- c("CN", "AQ", "NU", "LV", "EX")
+  analysis_choice <- c(DOC, DOM, CCAL, Levoglucosan, Excess)
+  analysiscodes <- analysis_opt[analysis_choice]
+  analysisn <- length(analysiscodes) #how many analytes there are
+  datacodes<- data.frame(code = rep(analysiscodes,times=sn)) %>% #add labcodes
+    mutate(analysis = case_when(
+      code == "CN" ~ "Shimadzu",
+      code == "AQ" ~ "Aqualog",
+      code == "NU" ~ "CCAL",
+      code == "LV" ~ "Levoglucosan",
+      code == "EX" ~ "Excess",
+      TRUE ~ NA_character_))
+  data_table <- data_label()
+  data_label<- data_table %>% #makes the frame
+    bind_rows()%>%
+    arrange(randomn)%>% #do not want to arrange yet 
+    slice(rep(1:n(), each = analysisn))%>%
+    mutate(datacodes)
+  
+  return(data_label) #add print here #add another print here
+
+
+
+}
+
+data_table<- data_labels()
+
+
+
+
+
+
+```
+
+
+
+
+

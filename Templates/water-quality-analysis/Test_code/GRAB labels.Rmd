@@ -1,0 +1,42 @@
+
+
+```{r}
+######### Filling in codes##########
+study <- "BDRK" #the study code
+samp_type <- "GB" #(GB,IS, SS, etc.)
+rn <- 1 #the start of a random number sequence. May change with projects or studies
+site <- read.csv("example_sites.csv") #import your site list. This file needs to have the header "site"
+#not sure how to do this without a specific header...
+blanktime <- "____________" #either have it blank or with sampling date "____________" or "YYYYMMDD____"
+
+#fill out analysis
+DOM <- TRUE
+DOC <- TRUE
+CCAL <- FALSE
+Levoglucosan <- TRUE
+Excess <- FALSE
+
+
+```
+
+```{r}
+## **Section 2- run libraries:**
+source("helper_grab.R")
+label <- labels()
+```
+
+
+```{r edit, warning=TRUE}
+datalabels<- read.csv("ex_BDRK_GB_20260823_label-table.csv")
+datalabels
+stop("check that date_text and time_text rows were filled out before proceeding")
+```
+
+
+```{r}
+#make datetimes and the sampleID with times
+source("helper_grab.R")
+lab<-labdata()
+
+```
+

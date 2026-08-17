@@ -1,0 +1,181 @@
+ 
+ 
+ 
+ 
+all info
+```{r}
+
+samp_type <- "GB" #"IS" = ISCO
+#add random number and study back here later
+
+DOC <- TRUE
+DOM <- TRUE
+CCAL <- TRUE
+Levoglucosan <- TRUE
+Excess <- TRUE
+
+
+
+
+
+if(samp_type=="IS"){
+study <- "SSEMG" #the study code
+rn <- 1 #the start of a random number sequence. May change with projects or studies
+site <- c("STA","COA") #sites as a vector
+nsamp <- c(24,24) #amount of samples per site. Matches the site vector above.
+interval <- c(2,2) #interval of sampling ISCO is programmed for, usually 2hrs
+
+
+knowntime <- FALSE
+
+if(knowntime==TRUE){
+start<- c("2026-02-23 15:00","2026-02-23 17:00")}
+else if (knowntime==FALSE){
+blanktime <- "____________" # either have it blank  "____________" or with sampling date "YYYYMMDD____" or "YYYYMM______", etc
+}
+}
+
+
+
+if(samp_type=="GB"){
+study <- "BDRK" #the study code
+rn <- 1 #the start of a random number sequence. May change with projects or studies
+
+
+#site <- read.csv("examples/example_sites_GB.csv") #import your site list. This file needs to have the header "site"
+
+
+
+#you need to have the library to open xlsx files?
+blanktime <- "____________" #either have it blank or with sampling date "____________" or "YYYYMMDD____"
+file <- "test-template-gb.xlsx"
+
+}
+
+
+
+```
+ 
+
+
+```{r blank tests}
+nLB <- 2 #number of lab/procedural blanks being used. 
+nFB <- 0 #number of field blanks being used. will probably need to add a description for where it was grabbed. 
+
+
+
+
+blks <- c("LBLK","FBLK") #name the type of blanks we have
+blk <-c(nLB,nFB) #number of lab and field blanks into a vector
+ts <- sum(sum(nsamp),sum(nLB,nFB)) #total sample amount. number of samples and number of blanks
+
+
+blanks <- data.frame(
+  blank_time = "____________", #this should be the date the blank is filtered. Just going to leave it blank
+  study = study,
+  samp_type= samp_type,
+  site= paste0(
+    name=rep(blks, times =blk), 
+    c(seq(from = 1, by = 1, length.out = nLB),seq(from = 1, by = 1, length.out = nFB))) #take the names of the blanks and repeat for how many there are, add numbers for how many of each type
+)
+blanks
+
+
+
+
+data_label_w_blanks <- function(){
+  sampleinfo <- data.frame(site=site,nsamp=nsamp,interval=interval,study=study,samp_type=samp_type,blanktime=blanktime, rn=rn)
+  data_info <- function(sampleinfo){ #this function creates 
+    return(data.frame(
+      site =rep(sampleinfo$site, times = sampleinfo$nsamp),
+      blank_time=sampleinfo$blanktime,
+      
+      botnum = sprintf("%02d",rep(1:24, times= ceiling(sampleinfo$nsamp/24))[1:sampleinfo$nsamp]),
+      study=sampleinfo$study,samp_type=sampleinfo$samp_type
+    ))}
+  labels<-lapply(1:nrow(sampleinfo),function(x){data_info(sampleinfo[x,])})%>%
+    bind_rows()%>% #might be able to combine 
+    bind_rows(blanks)%>% #updated to add blanks here 
+    mutate(
+      randomn=sample(rn:ts,ts, replace=F), # need to use total sample number 
+      sample_name = paste0(study, "_", "R", sprintf("%04d",randomn)),
+      field_sample_ID_blank= paste0(study, "_", site, "_", samp_type,"_",blanktime)
+      )
+  return(labels)
+}
+
+data_table_w_blanks <- data_label_w_blanks()
+# 
+# filter(data_table_w_blanks, samp_type=="BLK") %>%
+#   mutate(
+#   field_sample_ID_blank= paste0(study, "_", site, "_", samp_type,"_",blanktime)
+#   )
+# data_table_w_blanks
+
+
+```
+
+
+
+```{R field labels}
+pt2= FALSE
+
+
+source("sample-helper.R")
+
+#main file
+field <-field_label() #gives blank labels for field. Need field sample ID, Sample Name (bottlenum for IS) 
+field
+create_datasheets(field, file, "grab", "fieldlabel", open=TRUE)
+
+site<- read_xlsx(file,tab)%>%select(site)
+sn <- nrow(site) #how many sites there are  
+
+
+stop("save your code")
+```
+
+#code
+Rerun 1st part of code 
+```{R filter data sheets}
+#enter the known start times on the ISCO (look at section 1 to match it to the correct site order)
+
+# if (samp_type=="GB"){ #had to be in this order or code got confused about knowntime
+# blank_labels <- read.csv("examples/Blank_GB.csv") #grabbing this in 
+# }else if (samp_type=="IS" & knowntime==FALSE){
+# start <- c("2026-02-23 15:00","2026-02-23 17:00") #update time function or re-import 
+# blank_labels <- read.csv("examples/Blank_IS.csv")
+# }
+
+if (samp_type=="IS" & knowntime==FALSE){
+start <- c("2026-02-23 15:00","2026-02-23 17:00") #update time function or re-import 
+}
+pt2=TRUE
+source("sample-helper.R")
+data <- sample_ID()
+
+
+create_datasheets(data, file, "grab", "datetime", open=TRUE)
+
+
+datasheet <- data_sheet() #add to master function?
+source("sample-helper.R")
+create_datasheets(datasheet, file, "grab", "datasheet", open=TRUE)
+
+
+
+```
+
+-   Run code below:
+
+```{R lab labels}
+source("sample-helper.R")
+lab <- lab_label()
+
+create_datasheets(lab, file, "grab", "lablabel", open=TRUE)
+
+
+```
+
+
+
