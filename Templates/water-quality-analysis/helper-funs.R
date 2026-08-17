@@ -61,24 +61,7 @@ generateids <- function(sites){}
 #'  - Analysis
 #' - "datasheet" no df is needed, but dates and times should be filled out
 #' @returns Writes an `.xlsx` file to save location and opens up the file in excel.
-#' @examples
-#' df <- read.csv("Templates/water-quality-analysis/examples/Blank_IS.csv")
-#' saveloc <- "Templates/water-quality-analysis/example-template-is.xlsx"
-#' create_datasheets(df, saveloc, "isco", "datetime", open=FALSE, overwrite=TRUE)
-#' df <- read_xlsx("Templates/water-quality-analysis/examples/Final_IS.xlsx", sheet="field_labels")
-#' create_datasheets(df, saveloc, "isco", "fieldlabel", open=FALSE)
-#' df <- read_xlsx("Templates/water-quality-analysis/examples/Final_IS.xlsx", sheet="lab_labels")
-#' create_datasheets(df, saveloc, "isco", "lablabel", open=FALSE)
-#' create_datasheets(df, saveloc, "isco", "datasheet", open=TRUE)
 
-#' saveloc <- "Templates/water-quality-analysis/example-template-gb.xlsx"
-#' df <- read.csv("Templates/water-quality-analysis/examples/Blank_GB.csv")
-#' create_datasheets(df, saveloc, "grab", "datetime", open=FALSE, overwrite=FALSE)
-#' #df <- read_xlsx("Templates/water-quality-analysis/examples/Final_GB.xlsx", sheet="field_labels")
-#' #create_datasheets(df, saveloc, "grab", "fieldlabel", open=FALSE)
-#' df <- read_xlsx("Templates/water-quality-analysis/examples/Final_GB.xlsx", sheet="lab_labels")
-#' create_datasheets(df, saveloc, "grab", "lablabel", open=FALSE)
-#' create_datasheets(df, saveloc, "grab", "datasheet", open=TRUE)
 
 create_datasheets <- function(df, saveloc, samptype, type, open=FALSE, overwrite=FALSE){
   stopifnot(type %in% c("datetime", "fieldlabel", "lablabel", "datasheet"),

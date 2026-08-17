@@ -46,14 +46,14 @@ rn <- 1 #the start of a random number sequence. May change with projects or stud
 
 
 
-#not sure how to do this without a specific header...
+#you need to have the library to open xlsx files?
 blanktime <- "____________" #either have it blank or with sampling date "____________" or "YYYYMMDD____"
-file <- "test-template-bg.xlsx"
-site<- read_xlsx("test-template-bg.xlsx", "Sample-DateTime")
+file <- "test-template-gb.xlsx"
+
 }
 
-site<- read_xlsx("test-template-gb.xlsx", "Sample-DateTime")%>%select(site)
-site
+
+
 ```
  
 
@@ -122,33 +122,47 @@ pt2= FALSE
 
 
 source("sample-helper.R")
-source("helper-funs.R")
+
 #main file
-field <-field_label() #gives blank labels for field 
-field2<- field%>% select ("field_sample_ID_blank","sample_name")
-field2
-create_datasheets(field2, file, "grab", "fieldlabel", open=TRUE)
+field <-field_label() #gives blank labels for field. Need field sample ID, Sample Name (bottlenum for IS) 
+field
+create_datasheets(field, file, "grab", "fieldlabel", open=TRUE)
+
+site<- read_xlsx(file,tab)%>%select(site)
+sn <- nrow(site) #how many sites there are  
 
 
+stop("save your code")
 ```
 
 #code
-
+Rerun 1st part of code 
 ```{R filter data sheets}
 #enter the known start times on the ISCO (look at section 1 to match it to the correct site order)
 
-if (samp_type=="GB"){ #had to be in this order or code got confused about knowntime
-blank_labels <- read.csv("examples/Blank_GB.csv") #grabbing this in 
-}else if (samp_type=="IS" & knowntime==FALSE){
+# if (samp_type=="GB"){ #had to be in this order or code got confused about knowntime
+# blank_labels <- read.csv("examples/Blank_GB.csv") #grabbing this in 
+# }else if (samp_type=="IS" & knowntime==FALSE){
+# start <- c("2026-02-23 15:00","2026-02-23 17:00") #update time function or re-import 
+# blank_labels <- read.csv("examples/Blank_IS.csv")
+# }
+
+if (samp_type=="IS" & knowntime==FALSE){
 start <- c("2026-02-23 15:00","2026-02-23 17:00") #update time function or re-import 
-blank_labels <- read.csv("examples/Blank_IS.csv")
 }
 pt2=TRUE
 source("sample-helper.R")
-data <- data_sheet()
-data2<- data%>% select("field_sample_ID","sample_name","site","randomn","date_text_PST","time_text_PST")
+data <- sample_ID()
 
-create_datasheets(data, "test-template.xlsx", "grab", "datetime", open=TRUE,overwrite=TRUE)
+
+create_datasheets(data, file, "grab", "datetime", open=TRUE)
+
+
+datasheet <- data_sheet() #add to master function?
+source("sample-helper.R")
+create_datasheets(datasheet, file, "grab", "datasheet", open=TRUE)
+
+
 
 ```
 
@@ -156,20 +170,11 @@ create_datasheets(data, "test-template.xlsx", "grab", "datetime", open=TRUE,over
 
 ```{R lab labels}
 source("sample-helper.R")
-
-
 lab <- lab_label()
 
-lab2 <- lab %>% select ("field_sample_ID","sample_name", "analysis")
-create_datasheets(lab2, "test-template.xlsx", "grab", "lablabel", open=TRUE)
+create_datasheets(lab, file, "grab", "lablabel", open=TRUE)
 
-create_datasheets(data, "test-template.xlsx", "grab", "datasheet", open=TRUE)
-```
 
-```{r}
-
-  
-  return(data_labels) #add print here
 ```
 
 

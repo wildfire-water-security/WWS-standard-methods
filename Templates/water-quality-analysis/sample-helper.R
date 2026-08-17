@@ -2,13 +2,16 @@ library(dplyr)
 library(stringr)
 library(lubridate)
 library(writexl)
-
-
+library(openxlsx2)
 
 
 
 
 ###for ISCO unknown ##
+
+
+
+
 
 if (samp_type=="IS"){
 
@@ -110,6 +113,7 @@ if(pt2==TRUE & samp_type =="IS"){
 ####For grab samples ##
 
 if (samp_type=="GB"){
+site<- read_xlsx(file,"Sample-DateTime")%>%select(site)
 sn <- nrow(site) #how many sites there are  
 sampleinfo<- data.frame(site=site,study=study,samp_type=samp_type,blanktime=blanktime,sn=sn,rn=rn)
 field_label <- function(){ #this will add blank labels in 
@@ -126,7 +130,9 @@ field_label <- function(){ #this will add blank labels in
                                           site, "_",
                                           samp_type,"_",
                                           blanktime))#adds blank sample ID
-  return(field_data)
+  field_data
+  return(  field_data%>%select("field_sample_ID_blank",
+                               "sample_name"))
 }  
 
 
@@ -134,25 +140,36 @@ field_label <- function(){ #this will add blank labels in
 }#if GB 
 
 if(pt2==TRUE & samp_type=="GB"){
-  data_sheet <- function(){
-    updated_labels <-blank_labels %>%
-      mutate(datetime_PST=
-               paste0(sprintf("%06d",blank_labels$date_text_PST),"_",   #manual find 
-                      sprintf("%04d",blank_labels$time_text_PST)),
-             field_sample_ID =
-               paste0(study, "_",
-                      site, "_",
-                      samp_type,"_",
-                      datetime_PST))%>%
-      arrange(sample_name)
+  sampleinfo<- data.frame(study=study,samp_type=samp_type,blanktime=blanktime,sn=sn)
+  data<- read_xlsx(file,"Sample-DateTime")
+  sample_ID <- function(){
+    updated_labels <-data %>%
+      mutate(
+        sample_ID =
+          paste0(study, "_",
+                 data$site, "_",
+                 samp_type,"_",
+                 data$date_text_PST, "_",
+                 data$time_text_PST))
     return(updated_labels)
+    }
+    
   }
   
-} #if pt 2 
+  
+
+if (pt2==TRUE){ 
+data_sheet <- function(){  
+  data <-sample_ID()%>%
+    arrange(sample_name)}
+return(data_sheet)
+}
+  #if pt 2 
 
 
 if (pt2==TRUE){ 
 #this might be the same for ISCO 
+
 lab_label<- function(){  
   analysis_opt <- c("CN", "AQ", "NU", "EX", "LV")
   analysis_choice <- c(DOC, DOM, CCAL, Excess, Levoglucosan)
@@ -179,9 +196,115 @@ lab_label<- function(){
     slice(rep(1:n(), each = analysisn)) %>%
     mutate(datacodes,
            lab_sample_ID = #add in lab labels 
-             paste0(field_sample_ID, "_",
+             paste0(sample_ID, "_",
                     datacodes$code ))
   
-  return(lab_labels)
+  return(lab_labels%>%
+           select(lab_sample_ID,sample_name,analysis)
+         )
 }
 } #pt 3
+
+
+
+
+
+
+
+
+
+
+#katies function 
+create_datasheets <- function(df, saveloc, samptype, type, open=FALSE, overwrite=FALSE){
+  stopifnot(type %in% c("datetime", "fieldlabel", "lablabel", "datasheet"),
+            samptype %in% c("isco", "grab"))
+  
+  #locate template/workbook
+  if(file.exists(saveloc) & !overwrite){
+    #load existing workbook
+    path <- saveloc
+    
+  }else{
+    #get template
+    path <- list.files(getwd(), pattern = "^wqsample-label-datasheet-templates[.]xlsx", full.names = TRUE, recursive = TRUE)
+    if(length(path) == 0){
+      #download from github as a backup
+      path <- "https://github.com/wildfire-water-security/WWS-standard-methods/raw/refs/heads/main/Templates/water-quality-analysis/wqsample-label-datasheet-templates.xlsx"
+    }
+  }
+  
+  #read in template
+  tab <- wb_load(path)
+  
+  #add datetime
+  if(type == "datetime"){
+   
+    #don't overwrite dates/times
+    exist_data <- tab %>% wb_to_df(sheet="Sample-DateTime")
+    if(any(!is.na(exist_data$`Date (YYYYMMDD)`)) | any(!is.na(exist_data$`Time (HHMM)`))){
+    df <- df %>% select(-c(date_text_PST, time_text_PST))
+    }
+    tab <- tab %>% wb_add_data(sheet= "Sample-DateTime",
+                               x=df, dims="A2",col_names = FALSE)
+  }
+  
+  #add labels
+  if(type == "lablabel"){
+    tab <- tab %>% wb_add_data(sheet= "Labels-Lab", x= df, dims="A2", col_names=FALSE)
+  }
+  
+  if(type == "fieldlabel"){
+    tab <- tab %>% wb_add_data(sheet= "Labels-Field", x= df, dims="A2", col_names=FALSE)
+  }
+  
+  #add datasheets
+  if(type == "datasheet"){
+    ids <- tab %>% wb_to_df(sheet="Sample-DateTime") %>% select('sample_name','sample_ID') %>% arrange(`sample_name`)
+    tab <- tab %>% wb_add_data(sheet= "DS-Bottle Numbers", dims="A3", x=ids, col_names=FALSE)
+    tab <- tab %>% wb_add_data(sheet= "DS-Filter Weight", dims="A3", x=ids, col_names=FALSE)
+    
+    if (samp_type == "IS"){
+      tab <- tab %>% wb_add_data(sheet= "DS-ISCO Bottle Weight", dims="A3", x=ids, col_names=FALSE)}
+  }
+  
+  #save
+  wb_save(tab, file=saveloc)
+  
+  
+  #open if requested
+  if(open){
+    shell.exec(file.path(getwd(), saveloc))
+  }else{
+    cat(paste0("information populated and saved to:\n", saveloc))
+  }
+  
+  
+  
+  
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
