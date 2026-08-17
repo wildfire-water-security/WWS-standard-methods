@@ -40,9 +40,10 @@ prep_streamstats <- function(site_csv, data_wd, study_code, huc_code, crs="EPSG:
   sf::write_sf(sites, file.path(data_wd, paste0(study_code, "-sites"), paste0(study_code,"-sites.gpkg")))
 
   #also save one as _adj for editing
-  if(rewrite){
-    sf::write_sf(sites, file.path(data_wd, paste0(study_code, "-sites"),
-                                  paste0(study_code,"-sites_adj.gpkg")))
+  adj_path <- file.path(data_wd, paste0(study_code, "-sites"),
+                        paste0(study_code,"-sites_adj.gpkg"))
+  if(!file.exists(adj_path) || rewrite){
+    sf::write_sf(sites, adj_path)
   }
 
 
@@ -562,6 +563,15 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
   if("landuse" %in% layers){
     message("getting landuse data...")
 
+    retry_get_nlcd <- function(..., attempts = 5, wait = 10) {
+      for(i in seq_len(attempts)) {
+        out <- try(FedData::get_nlcd(...),silent = TRUE)
+        if(!inherits(out, "try-error")){return(out)}
+        if(i < attempts){Sys.sleep(wait * i)   # exponential-ish backoff
+      }}
+      stop("get_nlcd() failed after ", attempts, " attempts.")
+      }
+
     codes <- data.frame(
       name = c(
         "Open Water",
@@ -591,7 +601,7 @@ landscape_rasters <- function(data_wd, huc_code = NULL,
     if(file.exists(filename)){
       NLCD <- terra::rast(filename)
     }else{
-      NLCD <- FedData::get_nlcd(basin, label=basin$id, year=NLCD_year)
+      NLCD <- retry_get_nlcd(basin, label=basin$id, year=NLCD_year)
       terra::writeRaster(NLCD, filename, overwrite =TRUE)}
 
 
