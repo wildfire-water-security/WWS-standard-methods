@@ -1,4 +1,4 @@
 -Each sheet prints 30x labels. 
--There is a sheet for the collection bottles (field) and a sheet for post-filtered bottles (lab).
+-There is a sheet for the collection bottles (field) and a sheet for post-filtered bottles (lab) (with aqualog and shimadzu in separate sheets)
 -There is an example document for how to fill them out.
 -Print the lab ones to keep in Richardson and print the field ones for clipboards. 
