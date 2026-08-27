@@ -1,3 +1,98 @@
+
+#' Generate Standardized Sample IDs
+#'
+#' Uses provided information to create standardized sample ID's based on the the WWS Node 1
+#' sample naming procedure.
+#'
+#' @param study 4-5 letter code associated with the study
+#' @param sample_type type of sample being collected options include `GB`, `IS`, `SS`
+#' @param sites either a file path to a `.csv` file or a vector of site names
+#' @param start a vector of date/times or blank to use for sample collection
+#' @param nLB number of lab blanks
+#' @param nFB number of field blanks
+#' @param rn number to start the random number sequence. This is used to assign a random analysis order.
+#' @param nsamp number of samples that will be collected at each site, only used if `sample_type` is `IS`.
+#' @param interval number of hours between each sample taken, only used if `sample_type` is `IS`.
+#'
+#' @returns a `data.frame` containing information required to generate the sampleIDs
+#' @export
+#'
+#' @examples
+generate_ids <- function(study, sample_type, sites, start, nLB, nFB, rn, nsamp=NULL, interval=NULL){
+  stopifnot(is.character(study), sample_type %in% c("GB", "IS", "SS"),
+            is.numeric(nLB), is.numeric(nFB), is.numeric(rn))
+
+  #if sites are a .csv, extract info
+    if(length(sites) == 1 && grepl(".csv", sites)){
+      path <- list.files(here(), pattern=sites, recursive = TRUE)
+      sites <- read.csv(file.path(here(), path))[,1]
+    }
+
+  #if isco and we know times, fill in
+    if(samp_type == "IS"){
+      sitedf <- data.frame(site=sites, nsamp = nsamp, start=start, interval=interval)
+      start <- as.vector(apply(sitedf, MARGIN = 1, FUN = get_isco_times))
+      if(any(grepl("^\\d{10}$", start))){start <- as.POSIXct(start)}
+
+      #generate df of sample IDs
+      ids <- data.frame(study=study,
+                        site= rep(sites, times=nsamp),
+                        samp_type = samp_type,
+                        samp_time = start)
+    }else{
+      #generate df of sample IDs
+      ids <- data.frame(study=study,
+                        site= sites,
+                        samp_type = samp_type,
+                        samp_time = start)
+    }
+
+  #generate random IDs
+    randomid <- seq(from=rn, by=1, length=nrow(ids))
+    ids$randomn <- sample(randomid,nrow(ids), replace=F)
+
+  #replace date and time if available
+    knowntime <- is.POSIXct(ids$samp_time)
+    if(knowntime){
+      ids <- ids %>% mutate(date = strftime(samp_time, format="%Y%m%d"),
+                            time = strftime(samp_time, format="%H%M"),
+                            samp_time = paste(date,time, sep="_"))
+    }else{
+      ids <- ids %>% mutate(date = "",
+                            time = "")
+    }
+
+  #create full ids
+    ids <- ids %>% mutate(
+      sample_name=paste0(study, "_", "R", sprintf("%04d", randomn)),
+      field_sample_ID = paste0(study, "_",site, "_",samp_type,"_",samp_time))
+
+  return(ids)
+
+}
+
+#get isco times for each site
+#' Get ISCO times for a site
+#'
+#' @param df a data.frame with info required to generate the sequence of times.
+#'
+#' @returns a vector of times
+
+get_isco_times <- function(df){
+  df <- data.frame(as.list(df))
+
+  #if time specified fill in
+  if(grepl("^\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}$", df$start)){
+    df$start <- as.POSIXct(df$start)
+    times <- seq(df$start, by=paste0(as.numeric(df$interval), " hours"), length = as.numeric(df$nsamp))
+  }else{
+    #if time not specified, just repeat
+    times <- rep(df$start, times=df$nsamp)
+  }
+
+  return(times)
+}
+
 #packages needed to run code
 library(dplyr)
 library(stringr)

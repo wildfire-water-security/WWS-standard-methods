@@ -1,6 +1,6 @@
 ---
 title: "Water Quality Labels and Datasheets"
-author: "Emily Nussdorfer"
+author: "Emily Nussdorfer and Katie Wampler"
 date: "`r Sys.Date()`"
 output: html_document
 ---
@@ -8,9 +8,11 @@ output: html_document
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 source("helper-funs.R")
+require("openxlsx2")
+require("here")
 ```
 
-# Input Sampling Info
+# 1. Input Sampling Info
 
 ## Study and Site Info
 
@@ -18,12 +20,12 @@ source("helper-funs.R")
 -   **`samp_type:`** type of sample being collected
     -   `GB`: Grab samples
     -   `IS`: ISCO samples
-    -   `SS`: Soil sample (!!!! I can't remember if this is what SS was for)
--   **`rn`:** The number to start the random number sequence
+    -   `SS`: Soil sample
+-   **`rn`:** The number to start the random number sequence. This is used to assign a random analysis order.
 
 ```{r study-info}
 study <- "BDRK"
-samp_type <- "GB"
+samp_type <- "IS"
 rn <- 1
 ```
 
@@ -31,52 +33,81 @@ rn <- 1
 
 ### Grab Samples
 
--   **`site`:** file path to a `.csv` of site names where the first column is the site names.
+*(only required if `samp_type` is "GB")*
 
-    !!!! instead of leaving read.csv() here I'd incorporate it into the function (less code for people to mess up).
+-   **`sites`:** One of the following options:
 
--   **`blank_time`:** Either a line for a fully blank label or a date followed by a line for the time (ie. `"YYYYMMDD____"`)
+    -   File path to a `.csv` of site names where the first column is the site names.
+
+    -   To leave the site names blank, use `"______"` instead.
+
+-   **`start`:** Either a line for a fully blank label or a date followed by a line for the time (ie. `"YYYYMMDD____"`)
 
 ```{r grab-sample-info}
 if(samp_type == "GB"){
-  site <- "example_sites.csv"
-  blank_time <- "____________" 
+  sites <- "example_sites.csv"
+  start <- "____________" 
 }
 ```
 
 ### ISCO Samples
 
+*(only required if `samp_type` is "IS")*
+
+-   **`sites`:** A vector of site names (ie. `c("STA","COA")`)
+
+-   **`nsamp`**: The number of samples that will be collected at each site. Should either be a single number if consistent across sites, or formatted as a vector the same length as the number of sites (ie. `c(24,24)`)
+
+-   **`interval`**: The number of hours between each sample taken. Should either be a single number if consistent across sites, or formatted as a vector the same length as the number of sites (ie. `c(2,2)`)
+
+-   **`start`:** The start time to use on the labels, either:
+
+    -   A vector with the start time(s) if known formatted as YYYY-MM-DD HH:MM. Should either be a single character if consistent across sites, or formatted as a vector the same length as the number of sites (ie. `c("2026-02-23 15:00","2026-02-23 17:00")`)
+
+    -   If the start time is unknown use either a line for a fully blank label or a date followed by a line for the time (ie. `"YYYYMMDD____"`)
+
 ```{r isco-sample-info}
 if(samp_type == "IS"){
-site <- c("STA","COA") #sites as a vector
-nsamp <- c(24,24) #amount of samples per site. Matches the site vector above.
-interval <- c(2,2) #interval of sampling ISCO is programmed for, usually 2hrs
-sc <- "20260223" #what sample campaign this is, the date it starts "YYYYMMDD" or something like sample_campaign-#. This is for file name purposes 
-knowntime <- FALSE #fill TRUE When you have a time start and FALSE for if you don't know the time start. Knowing the time is the most efficient method.Important for If statements.  
-#fill if you have known time:
-start <- c("2026-02-23 15:00","2026-02-23 17:00")
-#fill if you don't know time:
-blanktime <- "____________" # either have it blank  "____________" or with sampling date "YYYYMMDD____" or "YYYYMM______", etc
-
+  sites <- c("STA","COA")
+  nsamp <- c(24,24)
+  interval <- c(2,2)
+  start <- c("2026-02-23 15:00","2026-02-23 17:00")
+  #start <- "20260223____"
 }
+```
 
+## Blanks
+
+**There are two types of blanks you may want to include:**
+
+-   **laboratory blanks (`nLB`)**: Blanks that test for contamination throughout the sample processing steps.
+
+-   **field blanks (`nFB`)**: Blanks that test for contamination throughout the entire sample collection process in the field through the analysis.
+
+Specify the number to include below.
+
+```{r blanks}
+nLB <- 2
+nFB <- 0
 ```
 
 ## Analysis Info
 
-Logical for which analysis will be performed on the samples:
+Logical (`TRUE`/`FALSE`) for which analysis will be performed on the samples:
 
 -   **`DOM`:** dissolved organic matter composition on the Aqualog
 -   **`DOC`:** dissolved organic carbon on the Shimadzu
 -   **`CCAL`:** additional analytes sent to outside labs
 -   **`Levoglucosan`:** levoglucosan to be archived for future analysis
+-   **`BPCA`:** benzenepolycarboxylic acid to quantify black carbon
 -   **`Excess`:** additional sample collected for other purposes (ie., sending to Node 3)
 
 ```{r analysis-info}
 DOM <- TRUE
 DOC <- TRUE
 CCAL <- FALSE
-Levoglucosan <- TRUE
+Levoglucosan <- FALSE
+BPCA <- FALSE
 Excess <- FALSE
 ```
 
@@ -84,21 +115,26 @@ Excess <- FALSE
 
 Specify where to export the spreadsheet with the sample names and datasheets.
 
-**`saveloc`:** the filepath to the location to save the excel file to.
-
-!!!! I think it's fine to set a standard file name and just put in the file location. Also if there are concerns about overwriting, you could just write the filename with the datetime using sys.time() so you wouldn't overwrite.
-
-!!! with markdown the default is that the wd is the same as where the markdown is, however, I find that super annoying and changed R settings so it's the project. which means that by default these files write out to the root directory. would suggest changing to have user specify file location and then use file.path(saveloc, filename) to save the file.
+**`saveloc`:** the filepath to the location to save the excel file (`.xlsx`) to.
 
 ```{r export-info}
-saveloc <- get_wd() 
+saveloc <- "example-sample-labels.xlsx"
 ```
 
-```{r generate-ids include=FALSE}
-set.seed(9) #!!! this will keep the randomization the same each time the code is run. 
+# 2. Create Labels
 
-# !!!! cal function to generate ids here (section 4)
-# !!! write to excel template (Sample-DateTime)
+## Create the SampleIDs
+
+Before creating the labels we will create the sample ID's based on the provided information.
+
+!!!! bottle number for isco??
+
+```{r generate-ids include=FALSE}
+set.seed(9) #keep the randomization the same each time the code is run. 
+
+generate_ids(study, samp_type, sites, start, nLB, nFB, rn, nsamp, interval)
+# !!! write to excel template (Sample-DateTime) 
+  #!!! only overwrite if blank, if not, just create the new filled IDs
 ```
 
 ```{r create-labels include=FALSE}

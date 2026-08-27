@@ -1,5 +1,3 @@
-
-
 ```{r}
 ######### Filling in codes##########
 study <- "BDRK" #the study code
@@ -25,13 +23,11 @@ source("helper_grab.R")
 label <- labels()
 ```
 
-
 ```{r edit, warning=TRUE}
 datalabels<- read.csv("ex_BDRK_GB_20260823_label-table.csv")
 datalabels
 stop("check that date_text and time_text rows were filled out before proceeding")
 ```
-
 
 ```{r}
 #make datetimes and the sampleID with times
@@ -39,4 +35,3 @@ source("helper_grab.R")
 lab<-labdata()
 
 ```
-
