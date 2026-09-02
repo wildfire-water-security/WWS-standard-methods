@@ -1,0 +1,122 @@
+---
+title: "Wildfire Study Site Options"
+format: revealjs
+editor: visual
+---
+
+## Austin Wildfire Options
+
+```{r loading things}
+#| include: false
+library(sf)
+library(hydrogeofetch)
+library(ggplot2)
+library(dplyr)
+library(terra)
+
+workdir <- file.path(fs::path_home(), "Documents/Projects/WWS-standard-methods/SOPs/Data Analysis/selecting-fire-sites")
+prjname <- "example"
+
+  
+site_info <- read_sf(file.path(workdir, paste0(prjname, "-selsite-opts.gpkg")))
+pot_basins <- read_sf(file.path(workdir, paste0(prjname, "-site-opts-basins.gpkg")))
+streams <- read_sf(file.path(workdir, paste0(prjname, "-streams.gpkg")))
+road_lines <- read_sf(file.path(workdir, paste0(prjname, "-roads.gpkg")))
+fires <- read_sf(file.path(workdir, paste0(prjname, "-fires.gpkg")))
+sf_use_s2(TRUE)
+fires <- st_make_valid(fires)
+sf_use_s2(FALSE)
+
+#function to create plot given a name
+#get area to plot 
+fires_flat <- st_transform(fires, crs="EPSG:32610")
+burn_buff <- st_buffer(fires_flat, dist = 7*1000)
+burn_buff <- st_transform(burn_buff, crs(streams))
+box <- st_bbox(burn_buff)
+
+make_plot <- function(name, box){
+  #get stream and basin
+comid <- site_info$comid[site_info$gnis_name == name] 
+sel_stream <- streams %>% filter(gnis_name == name)
+sel_basin <- pot_basins[pot_basins$comid == comid,]
+
+#create plot 
+ggplot() + 
+  geom_sf(data=fires, fill="red", color="darkred", alpha=0.5) +
+  geom_sf(data=streams, color="darkblue") +
+  geom_sf(data=sel_stream, color="blue") +
+  geom_sf(data= road_lines, color="gray10", linewidth=0.2) +
+  geom_sf(data=sel_basin, fill=NA, color="orange", linewidth=0.5
+) + 
+  coord_sf(xlim = c(box["xmin"], box["xmax"]), 
+           ylim = c(box["ymin"], box["ymax"]))
+} 
+
+#
+```
+
+```{r generate slides}
+#| results: asis
+#| echo: false
+
+
+attr <- data.frame(nice_name=c("Size (km2)", "Slope (deg)", "Conifer Forest (%)",
+                               "Shrub (%)", "Volcanic Rock (%)", 
+                               "Bankfull Width (m)", "Bankfull Depth (m)", 
+                               "Baseflow Index", 
+                               "Subsurface flow contact time (days)",
+                               "Topographic Wetness Index", 
+                               "Average annual runoff (mm)",
+                               "Soil Organic Matter (%)", "Soil Clay Content (%)",
+                               "Soil Sand Content (%)", "Soil Silt Content (%)",
+                               "Average Water Table Depth (ft)"),
+                   var_name=c("totdasqkm", "slope" , "pctconif2019ws", 
+                              "pctshrb2019ws", "pctextruvolws", "bankfullwidth",
+                              "bankfulldepth", "ACC_BFI", "ACC_CONTACT", 
+                              "ACC_TWI", "ACC_WB5100_ANN", "ACC_OM", 
+                              "ACC_CLAYAVE", "ACC_SANDAVE", "ACC_SILTAVE", 
+                              "ACC_WTDEP"))
+for (i in seq_len(nrow(site_info))) {
+
+  p1 <- make_plot(site_info$gnis_name[i], box)
+  
+  #zoom to basin
+  comid <- site_info$comid[site_info$gnis_name == site_info$gnis_name[i]] 
+  sel_basin <- pot_basins[pot_basins$comid == comid,]
+  basin_flat <- st_transform(sel_basin, crs="EPSG:32610")
+  basin_buff <- st_buffer(basin_flat, dist = 600)
+  basin_buff <- st_transform(basin_buff, crs(streams))
+  box_basin <- st_bbox(basin_buff)
+
+  p2 <- make_plot(site_info$gnis_name[i], box_basin)
+  
+  if(site_info$burned[i]){
+      cat("## Burn Option: ", site_info$gnis_name[i], "\n\n", sep = "")
+  }else{
+      cat("## Ref. Option: ", site_info$gnis_name[i], "\n\n", sep = "")
+  }
+
+
+  cat("::: {.columns}\n\n")
+
+  cat("::: {.column width=\"50%\"}\n\n")
+  print(p1)
+  print(p2)
+  cat("\n\n")
+  
+  cat("\n:::\n\n")
+
+  cat("::: {.column width=\"50%\"}\n\n")
+  cat('<div style="font-size: 0.5em;">\n\n')
+  
+  for(x in 1:nrow(attr)){
+    cat("**", attr$nice_name[x], ":** ", 
+        round(site_info[[attr$var_name[x]]][i], 2), "\n\n", sep = "")
+  }
+
+ cat("</div>\n\n")
+
+  cat(":::\n\n")
+  cat(":::\n\n")
+}
+```
