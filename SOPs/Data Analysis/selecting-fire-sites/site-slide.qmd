@@ -1,0 +1,66 @@
+## Burn Option: `r site_name`
+
+::: {.columns}
+
+::: {.column width="50%"}
+
+
+```{r}
+ #load data 
+  site_url <- file.path(workdir, i)
+  layer_names <- st_layers(site_url)$name
+  load_site <- layer_names %>%
+    map(~ assign(.x, 
+                 st_read(site_url, layer = .x, quiet = TRUE), envir = .GlobalEnv))
+  
+ #add to map 
+  zoom <- st_bbox(subbasins)
+  
+p <- basemap %>% 
+    addPolygons(data=subbasins, fill=NA, color="orange", group="Watersheds",
+                opacity=0.7, weight=4) %>% 
+    addPolylines(data=substreams, color="blue", opacity = 1, weight=2,
+                 label = ~htmlEscape(gnis_name)) %>%
+    addLayersControl(
+      overlayGroups = c("Sonde Data","Pre-Fire Data", "Previous Fires",
+                        "Watersheds"),
+      options = layersControlOptions(collapsed = FALSE)) %>% 
+    fitBounds(
+      lng1 = as.numeric(zoom["xmin"]), 
+      lat1 = as.numeric(zoom["ymin"]), 
+      lng2 = as.numeric(zoom["xmax"]), 
+      lat2 = as.numeric(zoom["ymax"]))
+
+htmltools::tagList(p)
+```
+
+::: 
+
+::: {.column width="50%"}
+
+<div style="font-size: 0.4em;">
+
+```{css}
+.reveal table tbody tr:nth-child(even) {
+  background-color: #gray;
+}
+```
+
+```{r}
+site_info <- substreams %>% arrange(desc(burned)) %>% st_drop_geometry() %>% select(-c(burned:poly_IncidentName)) %>% pivot_longer(lengthkm:euclid, names_to = "metric", values_to="value") %>% mutate(value=round(value, 2)) %>%
+  left_join(attr, by=join_by("metric" == "var_name")) %>% select(-c(metric, comid)) %>% 
+  filter(!is.na(nice_name)) %>%
+  pivot_wider(names_from = gnis_name, values_from = value) %>% 
+  mutate(type = factor(type, levels=c("Overall", "Hydrology", "Geology", "Vegetation","Soil"), ordered=TRUE)
+) %>% arrange(type) %>% select(-type)
+colnames(site_info)[1] <- "Metric"
+
+kable(site_info)
+
+```
+
+</div>
+
+:::
+
+:::
