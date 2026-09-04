@@ -169,7 +169,51 @@ We can also create some pre-populated datasheets once we've generated the full s
 create_datasheets(ids, saveloc, type="datasheet", open =TRUE, quiet=FALSE)
 ```
 
-# 3. Print Out Labels 
+# 3. Print Out Labels
+
+After running the following code you should find a word template for the labels named `study-bottle-labels.doc` in the same location as the datasheet template. Follow the instructions below to populate the labels for printing.
+
+!!! one for field and one for lab?
+
+```{r copy-label-template include=FALSE}
+dir <- dirname(saveloc) #get place where template info is writing to 
+wordtemploc <- file.path(dir, paste0(study, "-bottle-labels.doc"))
+
+#download template from github 
+temp  <- "https://github.com/wildfire-water-security/WWS-standard-methods/raw/refs/heads/main/Templates/water-quality-analysis/wqsample-labels.doc"
+
+download.file(url = temp, destfile = wordtemploc, mode = "wb", quiet=TRUE)
+```
+
+1.  Open the bottle label template file. Click **Enable Content** in the yellow bar at the top. This will allow the macros to color the labels to run.
+
+2.  Navigate to the **Mailings** tab in Word click **Start Mail Merge**, select **Labels**.
+
+    ![](images/clipboard-3426299386.png){width="393"}
+
+3.  Once it opens up the popup, **hit cancel and exit the window**. *If you hit OK it deletes the template and opens a new window and the format gets messed up.*
+
+    ![](images/clipboard-3383268000.png){width="484"}
+
+4.  Click **Select Recipients** and **Use an Existing List.**
+
+    ![](images/clipboard-2322842048.png){width="428"}
+
+5.  Navigate to your saved Excel file with the label information and datasheets. Click **Open**.
+
+6.  It will ask you to select which tab on your mailing list you are using.
+
+    -   For printing field labels choose `Labels-Field`
+
+    -   For printing lab labels choose `Labels-Lab`
+
+    -   Click **OK**.
+
+    > **Note:** Sometimes the window will shows doubles of your tabs. Not sure why. **Just click the top one.** It will still work.
+
+7.  Click **Insert Merge Field.**
+
+> **Note:** The template is set up to print labels to **Avery 5520 Address Labels**. If you need to print to a different label size you will need to modify the template.
 
 # 4. Print Out Datasheets
 
