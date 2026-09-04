@@ -5,7 +5,7 @@
 #' sample naming procedure.
 #'
 #' @param study 4-5 letter code associated with the study
-#' @param sample_type type of sample being collected options include `GB`, `IS`, `SS`
+#' @param samptype type of sample being collected options include `GB`, `IS`, `SS`
 #' @param sites either a file path to a `.csv` file or a vector of site names
 #' @param start a vector of date/times or blank to use for sample collection
 #' @param nLB number of lab blanks
@@ -18,8 +18,8 @@
 #' @export
 #'
 #' @examples
-generate_ids <- function(study, sample_type, sites, start, nLB, nFB, rn, nsamp=NULL, interval=NULL){
-  stopifnot(is.character(study), sample_type %in% c("GB", "IS", "SS"),
+generate_ids <- function(study, samptype, sites, start, nLB, nFB, rn, nsamp=NULL, interval=NULL){
+  stopifnot(is.character(study), samptype %in% c("GB", "IS", "SS"),
             is.numeric(nLB), is.numeric(nFB), is.numeric(rn))
 
   #if sites are a .csv, extract info
@@ -29,43 +29,62 @@ generate_ids <- function(study, sample_type, sites, start, nLB, nFB, rn, nsamp=N
     }
 
   #if isco and we know times, fill in
-    if(samp_type == "IS"){
+    if(samptype == "IS"){
       sitedf <- data.frame(site=sites, nsamp = nsamp, start=start, interval=interval)
       start <- as.vector(apply(sitedf, MARGIN = 1, FUN = get_isco_times))
       if(any(grepl("^\\d{10}$", start))){start <- as.POSIXct(start)}
 
       #generate df of sample IDs
+      if(length(nsamp) == 1){
+        nsamp <- rep(nsamp, length(sites))
+      }
       ids <- data.frame(study=study,
                         site= rep(sites, times=nsamp),
-                        samp_type = samp_type,
-                        samp_time = start)
+                        samptype = samptype,
+                        samp_time = start,
+                        botnum = as.vector(sapply(nsamp, seq_len)))
     }else{
       #generate df of sample IDs
       ids <- data.frame(study=study,
                         site= sites,
-                        samp_type = samp_type,
-                        samp_time = start)
+                        samptype = samptype,
+                        samp_time = start,
+                        botnum= "")
     }
+
+  #generate IDs for the blanks
+  if(sum(c(nLB, nFB)) > 0){
+    blankids <- data.frame(study=study,
+                           site=c(rep("LBLK", nLB), rep("FBLK", nFB)),
+                           samptype = samptype,
+                           samp_time = NA,
+                           botnum =  NA)
+    ids <- ids %>% bind_rows(blankids)
+  }
 
   #generate random IDs
     randomid <- seq(from=rn, by=1, length=nrow(ids))
     ids$randomn <- sample(randomid,nrow(ids), replace=F)
 
   #replace date and time if available
-    knowntime <- is.POSIXct(ids$samp_time)
+    knowntime <- is.POSIXct(ids$samp_time) & samptype == "IS"
     if(knowntime){
-      ids <- ids %>% mutate(date = strftime(samp_time, format="%Y%m%d"),
-                            time = strftime(samp_time, format="%H%M"),
-                            samp_time = paste(date,time, sep="_"))
+      ids <- ids %>% mutate(date = ifelse(site %in% c("LBLK", "FBLK"), " ", strftime(samp_time, format="%Y%m%d")),
+                            time = ifelse(site %in% c("LBLK", "FBLK"), " ", strftime(samp_time, format="%H%M")),
+                            samp_time = ifelse(site %in% c("LBLK", "FBLK"), "_____________", paste(date,time, sep="_")))
     }else{
       ids <- ids %>% mutate(date = "",
-                            time = "")
+                            time = "",
+                            samp_time = ifelse(site %in% c("LBLK", "FBLK"),"_____________", samp_time))
     }
+
+    ids <- ids %>% mutate(botnum = ifelse(site %in% c("LBLK", "FBLK"), " ", as.character(botnum)))
 
   #create full ids
     ids <- ids %>% mutate(
       sample_name=paste0(study, "_", "R", sprintf("%04d", randomn)),
-      field_sample_ID = paste0(study, "_",site, "_",samp_type,"_",samp_time))
+      field_sample_ID = paste0(study, "_",site, "_",samptype,"_",samp_time))
+
 
   return(ids)
 
@@ -100,25 +119,6 @@ library(lubridate)
 library(writexl)
 library(openxlsx2)
 
-#safewrite function
-safe.write_xlsx <- function(x, path, ...) {
-  if(file.exists(path)) {
-    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
-         "We don't want to overwrite randomized sample names\n",
-         "Check ", path, " to see if the already written file is ok.")
-  }
-  write_xlsx(x, path, ...)
-}
-
-safe.write_csv <- function(x, path, ...) {
-  if(file.exists(path)) {
-    stop("The file you are trying to write already exists. DO NOT OVERWRITE UNLESS YOU MEAN TO!\n",
-         "We don't want to overwrite randomized sample names\n",
-         "Check ", path, " to see if the already written file is ok.")
-  }
-  write.csv(x, path, ...)
-}
-
 #' Create sample IDs and names from sampling information
 #'
 #' @param sites a `data.frame`
@@ -131,14 +131,15 @@ generateids <- function(sites){}
 #' @param df `data.frame` containing the info to populate the table with. See details for what df should contain for each type.
 #' @param saveloc File path where file should be saved, including file name.
 #' @param type Character specifying the info to enter into template. Either
-#' "datetime", "lablabel", "fieldlabel", or "datasheet".
-#' @param samptype Character specifying the sample type. Either "isco" or "grab".
+#' "ids", "lablabel", "fieldlabel", or "datasheet".
+#' @param analyses vector of analyses to print labels for, should be logical and length 6
 #' @param open Logical, should excel file be opened on running?
 #' @param overwrite Logical, should existing template be overwritten?
+#' @param quiet Logical, should the save location be returned?
 #' @md
 #' @details
 #' If `type` is
-#' - "datetime" df should have five columns:
+#' - "ids" df should have five columns:
 #'  - Sample ID
 #'  - Sample Name
 #'  - Site
@@ -146,11 +147,11 @@ generateids <- function(sites){}
 #'  - Bottle Number (will be blank for grab)
 #'  - Date (may be blank)
 #'  - Time (may be blank)
-#' - "lablabel" df should have three columns:
+#' - "fieldlabel" df should have three columns:
 #'  - Sample ID
 #'  - Sample Name
 #'  - Bottle Number
-#' - "fieldlabel" df should have three columns:
+#' - "lablabel" df should have three columns:
 #'  - Sample ID
 #'  - Sample Name
 #'  - Analysis
@@ -158,9 +159,8 @@ generateids <- function(sites){}
 #' @returns Writes an `.xlsx` file to save location and opens up the file in excel.
 
 
-create_datasheets <- function(df, saveloc, samptype, type, open=FALSE, overwrite=FALSE){
-  stopifnot(type %in% c("datetime", "fieldlabel", "lablabel", "datasheet"),
-            samptype %in% c("isco", "grab"))
+create_datasheets <- function(df, saveloc, type, analyses=NULL, open=FALSE, overwrite=FALSE, quiet=TRUE){
+  stopifnot(type %in% c("ids", "fieldlabel", "lablabel", "datasheet"))
 
   #locate template/workbook
     if(file.exists(saveloc) & !overwrite){
@@ -180,17 +180,17 @@ create_datasheets <- function(df, saveloc, samptype, type, open=FALSE, overwrite
     tab <- wb_load(path)
 
   #add datetime
-    if(type == "datetime"){
-      if(samptype == "isco"){
-        df <- df %>% mutate(date_text_PST="", time_text_PST="",.after=botnum)}
-      if(samptype == "grab"){
-        df <- df %>% mutate(botnum="N/A", .before=randomn)}
-      site_df <- df %>% select(c("sample_name", "field_sample_ID_blank",
-                                 "site", "botnum","randomn", "date_text_PST", "time_text_PST"))
+    if(type == "ids"){
+      site_df <- df %>% select(c("sample_name", "field_sample_ID",
+                                 "site", "samptype", "botnum","randomn", "date", "time"))
       #don't overwrite dates/times
       exist_data <- tab %>% wb_to_df(sheet="Sample-DateTime")
       if(any(!is.na(exist_data$`Date (YYYYMMDD)`)) | any(!is.na(exist_data$`Time (HHMM)`))){
-           site_df <- site_df %>% select(-c(date_text_PST, time_text_PST))
+           site_df <- site_df %>% mutate(date = exist_data$`Date (YYYYMMDD)`,
+                                         time = exist_data$`Time (HHMM)`)
+
+           #create the new ids if the date/times have been recently entered manually
+           site_df <- site_df %>% mutate(field_sample_ID = paste0(study, "_",site, "_",samptype,"_",date, "_", time))
          }
       tab <- tab %>% wb_add_data(sheet= "Sample-DateTime",
                                  x=site_df, dims="A2",col_names = FALSE)
@@ -198,10 +198,24 @@ create_datasheets <- function(df, saveloc, samptype, type, open=FALSE, overwrite
 
   #add labels
     if(type == "lablabel"){
+      df <- tab %>% wb_to_df(sheet="Sample-DateTime") %>% select("Sample ID", "Sample Name")
+      codes <- names(analyses[analyses]) #code analyses we want to do
+
+      nice_names <- data.frame(code = c("CN", "AQ", "NU", "LV", "EX", "BC"),
+                               name = c("Shimadzu", "Aqualog", "CCAL", "Levoglucosan",
+                                        "Excess", "BPCA"))
+      #append ID with code
+        df <- lapply(codes, function(x){
+          df <- df %>% mutate(`Sample Name` = paste0(`Sample Name`, "_", x),
+                              analysis = nice_names$name[nice_names$code == x])
+          return(df)}) %>% bind_rows() %>% arrange(.data$analysis, .data$`Sample ID`)
+
       tab <- tab %>% wb_add_data(sheet= "Labels-Lab", x= df, dims="A2", col_names=FALSE)
     }
 
     if(type == "fieldlabel"){
+      df <- tab %>% wb_to_df(sheet="Sample-DateTime") %>% select("Sample ID", "Sample Name", "Bottle Number") %>%
+        mutate(`Bottle Number` = ifelse(is.na(`Bottle Number`), " ", `Bottle Number`))
       tab <- tab %>% wb_add_data(sheet= "Labels-Field", x= df, dims="A2", col_names=FALSE)
     }
 
@@ -215,7 +229,7 @@ create_datasheets <- function(df, saveloc, samptype, type, open=FALSE, overwrite
       n_page <- ceiling(rows / 37)
       clear <- (n_page*38 + 1)
       tab <- tab %>% wb_add_data(sheet= "DS-Bottle Numbers", dims="A3", x=ids, col_names=FALSE) %>%  #36/38 per page
-        wb_clean_sheet(dims = paste0("A", clear, ":G500"))
+        wb_clean_sheet(dims = paste0("A", clear, ":H500"))
 
       #prepare bottle weight df
       n_page <- ceiling(rows / 52)
@@ -238,9 +252,14 @@ create_datasheets <- function(df, saveloc, samptype, type, open=FALSE, overwrite
   #open if requested
     if(open){
       shell.exec(file.path(getwd(), saveloc))
-    }else{
+    }
+
+    if(!quiet){
       cat(paste0("information populated and saved to:\n", saveloc))
     }
+
+    return(invisible())
+
 
 
 

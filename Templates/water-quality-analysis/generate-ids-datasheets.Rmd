@@ -12,6 +12,8 @@ require("openxlsx2")
 require("here")
 ```
 
+## STILL TO DO: incorporate blanks
+
 # 1. Input Sampling Info
 
 ## Study and Site Info
@@ -25,7 +27,7 @@ require("here")
 
 ```{r study-info}
 study <- "BDRK"
-samp_type <- "IS"
+samptype <- "IS"
 rn <- 1
 ```
 
@@ -44,7 +46,7 @@ rn <- 1
 -   **`start`:** Either a line for a fully blank label or a date followed by a line for the time (ie. `"YYYYMMDD____"`)
 
 ```{r grab-sample-info}
-if(samp_type == "GB"){
+if(samptype == "GB"){
   sites <- "example_sites.csv"
   start <- "____________" 
 }
@@ -67,7 +69,7 @@ if(samp_type == "GB"){
     -   If the start time is unknown use either a line for a fully blank label or a date followed by a line for the time (ie. `"YYYYMMDD____"`)
 
 ```{r isco-sample-info}
-if(samp_type == "IS"){
+if(samptype == "IS"){
   sites <- c("STA","COA")
   nsamp <- c(24,24)
   interval <- c(2,2)
@@ -87,8 +89,8 @@ if(samp_type == "IS"){
 Specify the number to include below.
 
 ```{r blanks}
-nLB <- 2
-nFB <- 0
+nLB <- 3
+nFB <- 1
 ```
 
 ## Analysis Info
@@ -109,6 +111,10 @@ CCAL <- FALSE
 Levoglucosan <- FALSE
 BPCA <- FALSE
 Excess <- FALSE
+
+#store as a vector to more easily pass off 
+  analyses <- c(AQ = DOM, CN =DOC, NU = CCAL, LV = Levoglucosan, 
+                BC = BPCA, EX = Excess)
 ```
 
 ## Export Location
@@ -121,29 +127,62 @@ Specify where to export the spreadsheet with the sample names and datasheets.
 saveloc <- "example-sample-labels.xlsx"
 ```
 
-# 2. Create Labels
+# 2. Populate the Labels and Data Sheets
 
 ## Create the SampleIDs
 
 Before creating the labels we will create the sample ID's based on the provided information.
 
-!!!! bottle number for isco??
-
 ```{r generate-ids include=FALSE}
 set.seed(9) #keep the randomization the same each time the code is run. 
 
-generate_ids(study, samp_type, sites, start, nLB, nFB, rn, nsamp, interval)
-# !!! write to excel template (Sample-DateTime) 
-  #!!! only overwrite if blank, if not, just create the new filled IDs
+ids <- generate_ids(study, samptype, sites, start, nLB, nFB, rn, nsamp, interval)
+create_datasheets(ids, saveloc, type="ids")
 ```
+
+## Create the Labels
+
+After generating the sample ID information, we can create the information needed to put on the printed labels. There are two sets of labels:
+
+-   **Field Labels:** These will go on ISCO bottles or samples collected in the field. The time and/or date of collection on these labels may be blank.
+
+-   **Lab Labels:** These will go on alliquots of the original sample stored for various analyses. These labels should only be printed [after]{.underline} sample collection to ensure the correct date and time have been included on the label.
+
+    > If your initial collection timing was unknown, fill out the date and time of sample collection in the `Date (YYYYMMDD)` and `Time (HHMM)` columns of your spreadsheet on the `Sample-DateTime` sheet. If you have field blanks, update with the date and time of "collection". For analytical blanks use the date and time the blank was "created".
 
 ```{r create-labels include=FALSE}
-# !!!! check for if datetimes are in spreadsheet, if yes run otherwise don't 
-# section 6-8 here
-# !!! write to excel template (Labels-Field & Labels-Lab)
+create_datasheets(ids, saveloc, type="fieldlabel")
+create_datasheets(ids, saveloc, type="lablabel", analyses)
 ```
 
+## Create the Data Sheets
+
+We can also create some pre-populated datasheets once we've generated the full sample ID's. These include the following sheets within the excel document:
+
+-   **DS-Filter Weight:** Records the filter weights before and after filtering to calculate TSS concentrations.
+
+-   **DS-ISCO Bottle Weight:** Records the bottle weights of the ISCO bottles, used to calculate TSS concentrations.
+
+-   **DS-Bottle Numbers:** Records the bottle numbers of the analytical subsets for each sample.
+
 ```{r create-datasheets include=FALSE}
-# !!!! check for if datetimes are in spreadsheet, if yes run otherwise don't 
-# !!! write to excel template (DS-Filter Weight, DS-Bottle Numbers, DS-ISCO Bottle Weight)
+create_datasheets(ids, saveloc, type="datasheet", open =TRUE, quiet=FALSE)
 ```
+
+# 3. Print Out Labels 
+
+# 4. Print Out Datasheets
+
+1.  To print out the datasheets required for the project, open the excel document. Navigate to the sheet you want to print out. All of the datasheet sheets start with **DS-**.
+
+2.  Click `File` in the top toolbar.
+
+3.  Click `Print` on the left toolbar.
+
+4.  Check that the print preview looks correct. It should be set to the correct defaults.
+
+5.  Click the `Print` button after selecting the correct printer.
+
+6.  Repeat steps 1-5 for any datasheets required for the sampling event.
+
+# 
