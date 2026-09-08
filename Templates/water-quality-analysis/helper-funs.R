@@ -46,7 +46,7 @@ generate_ids <- function(study, samptype, sites, start, nLB, nFB, rn, nsamp=NULL
     }else{
       #generate df of sample IDs
       ids <- data.frame(study=study,
-                        site= sites,
+                        site= rep(sites, each=nsamp),
                         samptype = samptype,
                         samp_time = start,
                         botnum= "")
@@ -71,11 +71,11 @@ generate_ids <- function(study, samptype, sites, start, nLB, nFB, rn, nsamp=NULL
     if(knowntime){
       ids <- ids %>% mutate(date = ifelse(site %in% c("LBLK", "FBLK"), " ", strftime(samp_time, format="%Y%m%d")),
                             time = ifelse(site %in% c("LBLK", "FBLK"), " ", strftime(samp_time, format="%H%M")),
-                            samp_time = ifelse(site %in% c("LBLK", "FBLK"), "_____________", paste(date,time, sep="_")))
+                            samp_time = ifelse(site %in% c("LBLK", "FBLK"), paste(rep("_",15), collapse = ""), paste(date,time, sep="_")))
     }else{
       ids <- ids %>% mutate(date = "",
                             time = "",
-                            samp_time = ifelse(site %in% c("LBLK", "FBLK"),"_____________", samp_time))
+                            samp_time = ifelse(site %in% c("LBLK", "FBLK"),paste(rep("_",15), collapse = ""), samp_time))
     }
 
     ids <- ids %>% mutate(botnum = ifelse(site %in% c("LBLK", "FBLK"), " ", as.character(botnum)))
@@ -186,11 +186,18 @@ create_datasheets <- function(df, saveloc, type, analyses=NULL, open=FALSE, over
       #don't overwrite dates/times
       exist_data <- tab %>% wb_to_df(sheet="Sample-DateTime")
       if(any(!is.na(exist_data$`Date (YYYYMMDD)`)) | any(!is.na(exist_data$`Time (HHMM)`))){
+           #replace any blanks with a line
            site_df <- site_df %>% mutate(date = exist_data$`Date (YYYYMMDD)`,
-                                         time = exist_data$`Time (HHMM)`)
+                                         time = exist_data$`Time (HHMM)`) %>%
+             mutate(date = ifelse(date == " ", paste(rep("_",8), collapse = ""), date),
+                    time = ifelse(time == " ", paste(rep("_",4), collapse = ""), time))
 
            #create the new ids if the date/times have been recently entered manually
            site_df <- site_df %>% mutate(field_sample_ID = paste0(study, "_",site, "_",samptype,"_",date, "_", time))
+
+           #blank out the date and time again
+           site_df <- site_df %>% mutate(date = ifelse(date == paste(rep("_",8), collapse = ""), " ", date),
+                                         time = ifelse(time == paste(rep("_",4), collapse = ""), " ", time))
          }
       tab <- tab %>% wb_add_data(sheet= "Sample-DateTime",
                                  x=site_df, dims="A2",col_names = FALSE)
@@ -209,6 +216,12 @@ create_datasheets <- function(df, saveloc, type, analyses=NULL, open=FALSE, over
           df <- df %>% mutate(`Sample Name` = paste0(`Sample Name`, "_", x),
                               analysis = nice_names$name[nice_names$code == x])
           return(df)}) %>% bind_rows() %>% arrange(.data$analysis, .data$`Sample ID`)
+
+      #add a second label for BPCAs
+        if(analyses["BC"]){
+          bpca <- df %>% filter(analysis == "BPCA")
+          df <- df %>% bind_rows(bpca) %>% arrange(.data$analysis, .data$`Sample ID`)
+        }
 
       tab <- tab %>% wb_add_data(sheet= "Labels-Lab", x= df, dims="A2", col_names=FALSE)
     }
@@ -251,7 +264,7 @@ create_datasheets <- function(df, saveloc, type, analyses=NULL, open=FALSE, over
 
   #open if requested
     if(open){
-      shell.exec(file.path(getwd(), saveloc))
+      shell.exec(here(saveloc))
     }
 
     if(!quiet){
@@ -264,4 +277,38 @@ create_datasheets <- function(df, saveloc, type, analyses=NULL, open=FALSE, over
 
 
 
+}
+
+
+#' Copy Label Template to Project
+#'
+#' Uses the premade word template stored within the standards method repo to copy and rename into the
+#' working directory for the ID/template creation.
+#'
+#' @param saveloc File path where file should be saved, including file name.
+#' @param study 4-5 letter code associated with the study
+#' @param type Either `field` or `lab` which affects the naming of the template
+#'
+#' @md
+#' @returns Copies the Word (`.doc`) template to into the directory where the datasheet template is.
+#'
+copy_label_template <- function(saveloc, study, type){
+  stopifnot(type %in% c("lab", "field"))
+  dir <- dirname(saveloc) #get place where template info is writing to
+  if(type == "lab"){
+    wordtemploc <- file.path(dir, paste0(study, "-lab-labels.doc"))
   }
+
+  if(type == "field"){
+    wordtemploc <- file.path(dir, paste0(study, "-field-labels.doc"))
+  }
+
+  #only pull if we need the template
+  if(!file.exists(wordtemploc)){
+    #download template from github
+    temp  <- "https://github.com/wildfire-water-security/WWS-standard-methods/raw/refs/heads/main/Templates/water-quality-analysis/wqsample-labels.doc"
+
+    download.file(url = temp, destfile = wordtemploc, mode = "wb", quiet=TRUE)
+  }
+
+}

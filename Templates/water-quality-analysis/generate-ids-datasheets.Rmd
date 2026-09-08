@@ -12,8 +12,6 @@ require("openxlsx2")
 require("here")
 ```
 
-## STILL TO DO: incorporate blanks
-
 # 1. Input Sampling Info
 
 ## Study and Site Info
@@ -26,8 +24,8 @@ require("here")
 -   **`rn`:** The number to start the random number sequence. This is used to assign a random analysis order.
 
 ```{r study-info}
-study <- "BDRK"
-samptype <- "IS"
+study <- "SONDE"
+samptype <- "GB"
 rn <- 1
 ```
 
@@ -41,14 +39,17 @@ rn <- 1
 
     -   File path to a `.csv` of site names where the first column is the site names.
 
-    -   To leave the site names blank, use `"______"` instead.
+    -   To leave the site names blank, use `"___"` instead.
 
--   **`start`:** Either a line for a fully blank label or a date followed by a line for the time (ie. `"YYYYMMDD____"`)
+-   **`start`:** Either a line for a fully blank label (`"_____________"`) or a date followed by a line for the time (ie. `"YYYYMMDD_____"`)
+
+-   **`nsamp`:** The number of samples per site. Typically this will be one but can be used to generate multiple blank labels.
 
 ```{r grab-sample-info}
 if(samptype == "GB"){
-  sites <- "example_sites.csv"
-  start <- "____________" 
+  sites <- "___"
+  start <- "_____________"
+  nsamp <- 30
 }
 ```
 
@@ -89,8 +90,8 @@ if(samptype == "IS"){
 Specify the number to include below.
 
 ```{r blanks}
-nLB <- 3
-nFB <- 1
+nLB <- 0
+nFB <- 0
 ```
 
 ## Analysis Info
@@ -105,7 +106,7 @@ Logical (`TRUE`/`FALSE`) for which analysis will be performed on the samples:
 -   **`Excess`:** additional sample collected for other purposes (ie., sending to Node 3)
 
 ```{r analysis-info}
-DOM <- TRUE
+DOM <- FALSE
 DOC <- TRUE
 CCAL <- FALSE
 Levoglucosan <- FALSE
@@ -124,7 +125,8 @@ Specify where to export the spreadsheet with the sample names and datasheets.
 **`saveloc`:** the filepath to the location to save the excel file (`.xlsx`) to.
 
 ```{r export-info}
-saveloc <- "example-sample-labels.xlsx"
+#saveloc <- "example-sample-labels.xlsx"
+saveloc <- "C:/Users/wampleka/Documents/Projects/WWS-Node1-SONDE-postfire-sonde-network/field-forms-SOPs/SONDE-blank-labels-datasheets.xlsx"
 ```
 
 # 2. Populate the Labels and Data Sheets
@@ -173,16 +175,9 @@ create_datasheets(ids, saveloc, type="datasheet", open =TRUE, quiet=FALSE)
 
 After running the following code you should find a word template for the labels named `study-bottle-labels.doc` in the same location as the datasheet template. Follow the instructions below to populate the labels for printing.
 
-!!! one for field and one for lab?
-
 ```{r copy-label-template include=FALSE}
-dir <- dirname(saveloc) #get place where template info is writing to 
-wordtemploc <- file.path(dir, paste0(study, "-bottle-labels.doc"))
-
-#download template from github 
-temp  <- "https://github.com/wildfire-water-security/WWS-standard-methods/raw/refs/heads/main/Templates/water-quality-analysis/wqsample-labels.doc"
-
-download.file(url = temp, destfile = wordtemploc, mode = "wb", quiet=TRUE)
+copy_label_template(saveloc, study, "lab")
+copy_label_template(saveloc, study, "field")
 ```
 
 1.  Open the bottle label template file. Click **Enable Content** in the yellow bar at the top. This will allow the macros to color the labels to run.
@@ -203,15 +198,77 @@ download.file(url = temp, destfile = wordtemploc, mode = "wb", quiet=TRUE)
 
 6.  It will ask you to select which tab on your mailing list you are using.
 
-    -   For printing field labels choose `Labels-Field`
+    -   For printing **field labels** choose `Labels-Field`
 
-    -   For printing lab labels choose `Labels-Lab`
+    -   For printing **lab labels** choose `Labels-Lab`
 
     -   Click **OK**.
 
     > **Note:** Sometimes the window will shows doubles of your tabs. Not sure why. **Just click the top one.** It will still work.
 
-7.  Click **Insert Merge Field.**
+7.  Click **Insert Merge Field.** Then follow the specific directions below if you're printing out [field labels] or [lab labels].
+
+## Field Labels  
+
+1.  Choose **Sample_Name**. Then center the field in the center of the label and bold it.
+
+    ![](images/clipboard-2744484944.png)
+
+2.  If this is for ISCO samples, press space and enter to get to a new line, then go back to **Insert Merge Field** and choose **Bottle_Number**.
+
+3.  Change the font to **Consolas**. Make the font size of the sample name 12 pt. The bottle number can stay the default size. The fields should look like this:
+
+    ![](images/clipboard-407668865.png)
+
+4.  You can click the **Preview Results** button to check that that the label looks correct. Once you're happy with it, click the **Update Labels** button.
+
+5.  Click **Finish & Merge** then **Edit Individual Document**. It will prompt you to select the Merge records. Keep the default (all) and hit OK. This will open a new word document file with all your labels on it.
+
+    ![](images/clipboard-3651806612.png){width="258"}
+
+6.  To enhance clarity in the field, we will color the site name in red. Under the **Editing** tab, locate the **Replace** button.
+
+    ![](images/clipboard-2209262539.png){width="106"}
+
+7.  Put the first site name in both the **Find what:** and **Replace with:** sections. Then in the bottom left corner click **More \> \>** and then **Format** in the bottom left. Click **Style** and select the **SiteID** style. Ensure this shows up below the **Replace with**: box. Click **Replace All.**
+
+    ![](images/clipboard-706429255.png){width="541"}
+
+    > **Hint:** You can also use match prefix if you have many sites. To do this click **Match prefix** option and type your prefix (e.g., MCSN) followed by **\^&**.
+
+8.  Repeat for all your sites. The final labels should look like
+
+    ![](images/clipboard-2060211850.png){width="410"}
+
+9.  Print.
+
+## Lab Labels
+
+1.  Choose **Sample_Name**. Then center the field in the center of the label.
+
+    ![](images/clipboard-2744484944.png)
+
+2.  On a new line, add the **Lab_Sample_ID** and make it bold. Add two spaces and add the **Analysis.**
+
+3.  Change the font to **Consolas**. Make the font size of the sample ID and analysis 13 pt. It will look like this puts it on two lines, but it should be on a single line if you **Preview Results**.
+
+    ![](images/clipboard-4254508826.png)
+
+4.  You can click the **Preview Results** button to check that that the label looks correct. Once you're happy with it, click the **Update Labels** button.
+
+5.  Click **Finish & Merge** then **Edit Individual Document**. It will prompt you to select the Merge records. Keep the default (all) and hit OK. This will open a new word document file with all your labels on it.
+
+    ![](images/clipboard-3651806612.png){width="215"}
+
+6.  To enhance clarity we will color the analyses. To do this can you run a macro which will automatically recolor all the analyses. Go to **View** then **Macros** and select **View Macros** and select **Color_Analyses** then hit Run. This should make all the analyses names a unique color.
+
+    ![](images/clipboard-2758583050.png)
+
+7.   The final labels should look like
+
+    ![](images/clipboard-1173758715.png)
+
+8.  Print.
 
 > **Note:** The template is set up to print labels to **Avery 5520 Address Labels**. If you need to print to a different label size you will need to modify the template.
 
