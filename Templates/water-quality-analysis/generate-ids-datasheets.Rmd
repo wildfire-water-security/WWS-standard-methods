@@ -125,8 +125,7 @@ Specify where to export the spreadsheet with the sample names and datasheets.
 **`saveloc`:** the filepath to the location to save the excel file (`.xlsx`) to.
 
 ```{r export-info}
-#saveloc <- "example-sample-labels.xlsx"
-saveloc <- "C:/Users/wampleka/Documents/Projects/WWS-Node1-SONDE-postfire-sonde-network/field-forms-SOPs/SONDE-blank-labels-datasheets.xlsx"
+saveloc <- "example-sample-labels.xlsx"
 ```
 
 # 2. Populate the Labels and Data Sheets
