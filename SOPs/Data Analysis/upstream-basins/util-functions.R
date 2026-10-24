@@ -1,3 +1,5 @@
+## TODO put this into more than one spot, tidy with newly working streamstats functions (see lscs project)
+
 #' Prepare data required to submit to StreamStats
 #'
 #' Downloads the required datasets and snaps provided sites to the
@@ -193,6 +195,271 @@ snap_streamstats <- function(data_wd, study_code, snap_dist = 1000){
 
 }
 
+#helper  functions to interact with the USGS API
+get_json <- function(url, query = list()) {
+  resp <- httr::GET(url, query = query)
+  httr::stop_for_status(resp)
+
+  jsonlite::fromJSON(
+    httr::content(resp, as = "text", encoding = "UTF-8"),
+    simplifyVector = FALSE
+  )
+}
+post_json <- function(url, body, query = list()) {
+  resp <- httr::POST(
+    url,
+    query = query,
+    httr::content_type_json(),
+    body = body,
+    encode = "json"
+  )
+
+  httr::stop_for_status(resp)
+
+  jsonlite::fromJSON(
+    httr::content(resp, as = "text", encoding = "UTF-8"),
+    simplifyVector = FALSE
+  )
+}
+
+#' Gets the streamstats basin for a given lat and long
+#'
+#' @param lat latitude of the site
+#' @param lon longitude of the site
+#' @param region Two digit state or region code associated with the sites.
+#'
+#' @returns a list:
+#' - response: the raw json response
+#' - feature: the basin feature to pass to other API calls
+#' - basin: the shapefile of the delineated basin
+#' @export
+#' @md
+delineate_basin <- function(lat, lon, region){
+  resp <- httr::GET(
+    paste0(
+      "https://streamstats.usgs.gov",
+      "/ss-delineate/v1/delineate/sshydro/",
+      region
+    ),
+    query = list(lat = lat, lon = lon)
+  )
+
+  httr::stop_for_status(resp)
+
+  del <- jsonlite::fromJSON(
+    httr::content(resp, as = "text", encoding = "UTF-8"),
+    simplifyVector = FALSE
+  )
+
+  # Inspect the nested response structure before relying on this path.
+  fc <- del$bcrequest$wsresp$featurecollection[[1]][[2]]
+
+  features <- fc$feature
+
+  # Find the feature representing the entire watershed.
+  global_feature <- features$features[[1]]
+
+  basin <- sf::st_read(jsonlite::toJSON(features, auto_unbox = TRUE),quiet = TRUE)
+
+  list(
+    response = del,
+    feature = global_feature,
+    basin = basin
+  )
+}
+
+#' Get basins and save them for each site
+#'
+#' @param snap_sites outputs from `snap_streamstats`
+#' @param region Two digit state or region code associated with the sites.
+#' @param study_code
+#' @param data_wd
+#' @param temp_dir temporary location to save the outputs to
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+query_basins <- function(snap_sites, region, study_code, data_wd, temp_dir){
+  #save results and store in temp file
+  sites <- sf::st_transform(snap_sites, "EPSG:4326")
+
+  #extract lat and longs
+  coords <- sf::st_coordinates(sites)
+  sites$lat <- coords[,2]
+  sites$long <- coords[,1]
+
+  basin_output <- tempdir()
+  basins <- pbapply::lapply(1:nrow(sites), function(x){
+    result <- delineate_basin(sites$lat[x], sites$long[x], region)
+
+    saveRDS(result, file.path(basin_output, paste0(sites$siteID[x], ".rds")))
+    return(result$basin %>% mutate(siteID = sites$siteID[x]))
+  }) %>% dplyr::bind_rows()
+  write_sf(basins, file.path(data_wd, "/", paste0(study_code, "-basins.gpkg")), overwrite=TRUE)
+
+}
+
+#' Get the flow scenarios for the basin based on a delineated basin
+#'
+#' Uses the output of  and `get_basin_characteristics` to
+#' calculate flow statistics.
+#'
+#' @param region Two digit state or region code associated with the sites.
+#' @param stat_groups the flow statistics to calculate
+#' @param feature `feature` from the output of `delineate_basin`
+#' @param char the output from `get_basin_characteristics`
+#' @md
+#' @returns a data.frame with the flow scenario values.
+#' @export
+#'
+get_flow_stats <- function(feature, region, stat_groups = c("LFS","PFS", "FDS"), char){
+  nss_base <- "https://streamstats.usgs.gov/nssservices"
+
+  #get the regional regressions
+  reg <- post_json(
+    paste0(nss_base, "/regressionregions/bylocation"),
+    body = feature$geometry)
+  regression_regions <- unique(sapply(reg, function(x){x$code}))
+
+  #get the scenarios
+  scenarios <- get_json(
+    paste0(nss_base, "/scenarios"),
+    query = list(
+      regions = region,
+      statisticgroups = paste(stat_groups, collapse = ","),
+      regressionregions = paste(regression_regions, collapse = ",")
+    ))
+
+  #add in the char to do the calculations
+  bc_values <- setNames(lapply(char, `[[`, "value"),vapply(char, `[[`, character(1), "code"))
+  # Update scenario parameter values
+  for(i in seq_along(scenarios)){
+    for (j in seq_along(scenarios[[i]]$regressionRegions)) {
+      params <- scenarios[[i]]$regressionRegions[[j]]$parameters
+
+      for (k in seq_along(params)) {
+        code <- params[[k]]$code
+
+        if (!is.null(bc_values[[code]])) {
+          scenarios[[i]]$regressionRegions[[j]]$parameters[[k]]$value <-
+            bc_values[[code]]
+        }
+      }
+    }
+  }
+
+  #get the calculated flow variables
+  flow_est <- post_json(
+    paste0(nss_base, "/scenarios/estimate"),
+    body = scenarios,
+    query = list(regions = region)
+  )
+
+  #get into a nice table
+  scenario_table <- map_dfr(flow_est, function(s){
+    map_dfr(s$regressionRegions, function(r){
+      map_dfr(r$results, function(x){
+        tibble(
+          statistic_group = s$statisticGroupName,
+          region = r$name,
+          flow_stat = x$name,
+          code = x$code,
+          desc = x$description,
+          value = x$value,
+          units = x$unit$unit %||% NA_character_
+        )
+      })
+    })
+  })
+
+  return(scenario_table)
+}
+
+#' Get streamstats info for a single site
+#'
+#' Gets basin characteristics, flow statistics, and the basin for a site's lat and long.
+#'
+#' @param lat latitude of the site
+#' @param lon longitude of the site
+#' @param region Two digit state or region code associated with the sites.
+#' @param stat_groups the flow statistics to calculate
+#' @param bc_labels either `NULL` or semicolon-separated characteristic codes (may impact flow calculations)
+#' @param basin_file the path to the temporary streamstats basin information as an .rds
+#'
+#' @returns
+#' @export
+#'
+#' @examples
+get_site_streamstats <- function(lat, lon, region, basin_file=NULL, stat_groups=c("LFS","PFS", "FDS"), bc_labels=NULL){
+  #delineate basin
+  if(is.null(basin_file)){result <- delineate_basin(lat, long, region)
+    }else{
+      result <- readRDS(basin_file)
+    }
+
+  basin <- result$basin
+  del <- result$response
+  feature <- result$feature
+
+  #get characteristics
+  bc <- get_basin_characteristics(del, bc_labels)
+  char <- bc$char_table
+
+  #get flow stats
+  flow <- get_flow_stats(feature, region, stat_groups, bc$char)
+
+  #return all the things
+  return(list(basin= basin,
+              char = char,
+              flow = flow))
+}
+
+#' Get streamstats basin characteristics
+#'
+#' @param del the raw output from `delineate_basin`
+#' @param bc_labels either `NULL` or semicolon-separated characteristic codes
+#'
+#' @returns a list of length two:
+#' - char: the raw output from the API
+#' - char_table: a `data.frame` with the characteristics for the basin
+#' @md
+get_basin_characteristics <- function(del, bc_labels = NULL){
+  hydro_base <- "https://streamstats.usgs.gov/ss-hydro/v1"
+
+  # If bc_labels is NULL, retain the delineation response as returned.
+  # If the service response contains a bcLabels field, it can be
+  # replaced with the required semicolon-separated characteristic codes.
+  request_body <- del
+
+  if (!is.null(bc_labels)) {
+    # Verify this field's exact location in your delineation response.
+    request_body$bcrequest$bcLabels <- paste(
+      bc_labels,
+      collapse = ";"
+    )
+  }
+
+  bc <- post_json(
+    paste0(
+      hydro_base,
+      "/basin-characteristics/calculate"
+    ),
+    body = request_body
+  )
+
+  bc_table <- map_dfr(bc, function(s) {
+    tibble(
+      parameter = s$name,
+      code = s$code,
+      desc = s$description,
+      value = s$value,
+      units = s$unit %||% NA_character_)
+  })
+
+  return(list(char = bc,
+              char_table = bc_table))
+}
 
 #' Query StreamStats API for upstream basins
 #'
@@ -201,63 +468,44 @@ snap_streamstats <- function(data_wd, study_code, snap_dist = 1000){
 #'
 #' @param snapped_points An `sf` object with snapped sites.
 #' @param region Two digit state or region code associated with the sites.
+#' @param basin_output a temporary directory with the outputs from the basin delineation.
 #'
 #' @returns A `sf` object with a `multipolygon` of the upstream area for each row in `snapped_points`.
 #' @export
 #' @md
 #'
-get_streamstats <- function(snapped_points, region){
+get_streamstats <- function(snapped_points, region, basin_output){
   stopifnot(inherits(snapped_points, "sf"), nchar(region) == 2)
 
-  #ensure correct crs
-  sites <- sf::st_transform(snapped_points, "EPSG:4326")
-
-  #extract lat and longs
-  coords <- sf::st_coordinates(sites)
-  sites$lat <- coords[,2]
-  sites$long <- coords[,1]
-  sites$api_basin <- paste0("https://streamstats.usgs.gov/ss-delineate/v1/delineate/sshydro/", region,
-                     "?lat=", sites$lat, "&lon=", sites$long)
-  sites$api_char <-  paste0("https://streamstats.usgs.gov/ss-hydro/v1/basin-characteristics/calculate-using-ssdelineate/?region=", region,
-                            "&lat=", sites$lat, "&lon=", sites$long)
-
-  #get basins
-  download_basin <- function(site, region, lat, long){
-    base_url <- "https://streamstats.usgs.gov/"
-
-    #get basin
-    resp_del <- httr::GET(paste0(base_url, "/ss-delineate/v1/delineate/sshydro/", region,"?lat=", lat, "&lon=", long))
-    httr::stop_for_status(resp_del)
-    txt_del <- httr::content(resp_del, as = "text", encoding = "UTF-8")
-    del <- jsonlite::fromJSON(txt_del, simplifyVector = FALSE)
-
-    fc_list <- del$bcrequest$wsresp$featurecollection[[1]][[2]]
-    basin <- sf::st_read(jsonlite::toJSON(fc_list$feature, auto_unbox = TRUE),quiet = TRUE)
-
-  #get characteristics currently can't get API to work
-    # resp_bc <- httr::POST(paste0(base_url, "ss-hydro/v1/basin-characteristics/calculate"),
-    #                       config=list(httr::add_headers(accept = "application/json",`Content-Type` = "application/json")),
-    #   body = del,
-    #   encode = "json")
-    #
-    # httr::stop_for_status(resp_bc)
-    #
-    # txt_bc <- httr::content(resp_bc, as = "text", encoding = "UTF-8")
-    # bc <- fromJSON(txt_bc, simplifyVector = TRUE)
-
-
-    return(basin)
-
-  }
+  sites <- snapped_points %>% mutate(basin_file = file.path(basin_output, paste0(siteID, ".rds")))
+  #get streamstats data
   message("downloading basins from streamstats...")
-  basins <- pbapply::pblapply(1:nrow(sites),
-                              function(x){download_basin(sites$siteID[x], region, sites$lat[x], sites$long[x])})
-
+  basin_info <- pbapply::pblapply(1:nrow(sites),
+                                  function(x){get_site_streamstats(sites$lat[x], sites$long[x], region, sites$basin_file[x])})
   #save basins
-  basins_df <- basins %>% dplyr::bind_rows() %>% dplyr::mutate(siteID = sites$siteID, .before="GlobalWshd")
+  basins_df <- lapply(basin_info, function(x){x$basin}) %>% dplyr::bind_rows() %>% dplyr::mutate(siteID = sites$siteID, .before="GlobalWshd")
+
+  #get char
+  char_meta <- basin_info[[1]]$char %>% select(-value)
+  char_df <- lapply(basin_info, function(x){
+    x$char %>% select(code, value) %>% tidyr::pivot_wider(names_from = code, values_from = value)}) %>%
+    dplyr::bind_rows() %>%
+    dplyr::mutate(siteID = sites$siteID, .before=1)
+
+  #get flow
+  flow_meta <- basin_info[[1]]$flow %>% select(-value)
+  flow_df <- lapply(basin_info, function(x){
+    x$flow %>% select(code, region, value) %>% group_by(code) %>%
+      slice_tail(n = 1) %>% select(-region) %>% tidyr::pivot_wider(names_from = code, values_from = value)}) %>%
+    dplyr::bind_rows() %>%
+    dplyr::mutate(siteID = sites$siteID, .before=1)
 
   #return to user
-  return(basins_df)
+  return(list(basins = basins_df,
+              char =char_df,
+              char_meta = char_meta,
+              flow = flow_df,
+              flow_meta = flow_meta))
 
 }
 
