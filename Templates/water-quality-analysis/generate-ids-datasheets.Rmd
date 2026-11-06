@@ -16,12 +16,12 @@ require("here")
 
 ## Study and Site Info
 
--   **`study`:** 4-5 letter code associated with the study
--   **`samp_type:`** type of sample being collected
-    -   `GB`: Grab samples
-    -   `IS`: ISCO samples
-    -   `SS`: Soil sample
--   **`rn`:** The number to start the random number sequence. This is used to assign a random analysis order.
+- **`study`:** 4-5 letter code associated with the study
+- **`samp_type:`** type of sample being collected
+  - `GB`: Grab samples
+  - `IS`: ISCO samples
+  - `SS`: Soil sample
+- **`rn`:** The number to start the random number sequence. This is used to assign a random analysis order.
 
 ```{r study-info}
 study <- "SONDE"
@@ -35,15 +35,15 @@ rn <- 1
 
 *(only required if `samp_type` is "GB")*
 
--   **`sites`:** One of the following options:
+- **`sites`:** One of the following options:
 
-    -   File path to a `.csv` of site names where the first column is the site names.
+  - File path to a `.csv` of site names where the first column is the site names.
 
-    -   To leave the site names blank, use `"___"` instead.
+  - To leave the site names blank, use `"___"` instead.
 
--   **`start`:** Either a line for a fully blank label (`"_____________"`) or a date followed by a line for the time (ie. `"YYYYMMDD_____"`)
+- **`start`:** Either a line for a fully blank label (`"_____________"`) or a date followed by a line for the time (ie. `"YYYYMMDD_____"`)
 
--   **`nsamp`:** The number of samples per site. Typically this will be one but can be used to generate multiple blank labels.
+- **`nsamp`:** The number of samples per site. Typically this will be one but can be used to generate multiple blank labels.
 
 ```{r grab-sample-info}
 if(samptype == "GB"){
@@ -57,17 +57,17 @@ if(samptype == "GB"){
 
 *(only required if `samp_type` is "IS")*
 
--   **`sites`:** A vector of site names (ie. `c("STA","COA")`)
+- **`sites`:** A vector of site names (ie. `c("STA","COA")`)
 
--   **`nsamp`**: The number of samples that will be collected at each site. Should either be a single number if consistent across sites, or formatted as a vector the same length as the number of sites (ie. `c(24,24)`)
+- **`nsamp`**: The number of samples that will be collected at each site. Should either be a single number if consistent across sites, or formatted as a vector the same length as the number of sites (ie. `c(24,24)`)
 
--   **`interval`**: The number of hours between each sample taken. Should either be a single number if consistent across sites, or formatted as a vector the same length as the number of sites (ie. `c(2,2)`)
+- **`interval`**: The number of hours between each sample taken. Should either be a single number if consistent across sites, or formatted as a vector the same length as the number of sites (ie. `c(2,2)`)
 
--   **`start`:** The start time to use on the labels, either:
+- **`start`:** The start time to use on the labels, either:
 
-    -   A vector with the start time(s) if known formatted as YYYY-MM-DD HH:MM. Should either be a single character if consistent across sites, or formatted as a vector the same length as the number of sites (ie. `c("2026-02-23 15:00","2026-02-23 17:00")`)
+  - A vector with the start time(s) if known formatted as YYYY-MM-DD HH:MM. Should either be a single character if consistent across sites, or formatted as a vector the same length as the number of sites (ie. `c("2026-02-23 15:00","2026-02-23 17:00")`)
 
-    -   If the start time is unknown use either a line for a fully blank label or a date followed by a line for the time (ie. `"YYYYMMDD____"`)
+  - If the start time is unknown use either a line for a fully blank label or a date followed by a line for the time (ie. `"YYYYMMDD____"`)
 
 ```{r isco-sample-info}
 if(samptype == "IS"){
@@ -83,9 +83,9 @@ if(samptype == "IS"){
 
 **There are two types of blanks you may want to include:**
 
--   **laboratory blanks (`nLB`)**: Blanks that test for contamination throughout the sample processing steps.
+- **laboratory blanks (`nLB`)**: Blanks that test for contamination throughout the sample processing steps.
 
--   **field blanks (`nFB`)**: Blanks that test for contamination throughout the entire sample collection process in the field through the analysis.
+- **field blanks (`nFB`)**: Blanks that test for contamination throughout the entire sample collection process in the field through the analysis.
 
 Specify the number to include below.
 
@@ -98,12 +98,12 @@ nFB <- 0
 
 Logical (`TRUE`/`FALSE`) for which analysis will be performed on the samples:
 
--   **`DOM`:** dissolved organic matter composition on the Aqualog
--   **`DOC`:** dissolved organic carbon on the Shimadzu
--   **`CCAL`:** additional analytes sent to outside labs
--   **`Levoglucosan`:** levoglucosan to be archived for future analysis
--   **`BPCA`:** benzenepolycarboxylic acid to quantify black carbon
--   **`Excess`:** additional sample collected for other purposes (ie., sending to Node 3)
+- **`DOM`:** dissolved organic matter composition on the Aqualog
+- **`DOC`:** dissolved organic carbon on the Shimadzu
+- **`CCAL`:** additional analytes sent to outside labs
+- **`Levoglucosan`:** levoglucosan to be archived for future analysis
+- **`BPCA`:** benzenepolycarboxylic acid to quantify black carbon
+- **`Excess`:** additional sample collected for other purposes (ie., sending to Node 3)
 
 ```{r analysis-info}
 DOM <- FALSE
@@ -145,11 +145,11 @@ create_datasheets(ids, saveloc, type="ids")
 
 After generating the sample ID information, we can create the information needed to put on the printed labels. There are two sets of labels:
 
--   **Field Labels:** These will go on ISCO bottles or samples collected in the field. The time and/or date of collection on these labels may be blank.
+- **Field Labels:** These will go on ISCO bottles or samples collected in the field. The time and/or date of collection on these labels may be blank.
 
--   **Lab Labels:** These will go on alliquots of the original sample stored for various analyses. These labels should only be printed [after]{.underline} sample collection to ensure the correct date and time have been included on the label.
+- **Lab Labels:** These will go on alliquots of the original sample stored for various analyses. These labels should only be printed [after]{.underline} sample collection to ensure the correct date and time have been included on the label.
 
-    > If your initial collection timing was unknown, fill out the date and time of sample collection in the `Date (YYYYMMDD)` and `Time (HHMM)` columns of your spreadsheet on the `Sample-DateTime` sheet. If you have field blanks, update with the date and time of "collection". For analytical blanks use the date and time the blank was "created".
+  > If your initial collection timing was unknown, fill out the date and time of sample collection in the `Date (YYYYMMDD)` and `Time (HHMM)` columns of your spreadsheet on the `Sample-DateTime` sheet. If you have field blanks, update with the date and time of "collection". For analytical blanks use the date and time the blank was "created".
 
 ```{r create-labels include=FALSE}
 create_datasheets(ids, saveloc, type="fieldlabel")
@@ -160,11 +160,11 @@ create_datasheets(ids, saveloc, type="lablabel", analyses)
 
 We can also create some pre-populated datasheets once we've generated the full sample ID's. These include the following sheets within the excel document:
 
--   **DS-Filter Weight:** Records the filter weights before and after filtering to calculate TSS concentrations.
+- **DS-Filter Weight:** Records the filter weights before and after filtering to calculate TSS concentrations.
 
--   **DS-ISCO Bottle Weight:** Records the bottle weights of the ISCO bottles, used to calculate TSS concentrations.
+- **DS-ISCO Bottle Weight:** Records the bottle weights of the ISCO bottles, used to calculate TSS concentrations.
 
--   **DS-Bottle Numbers:** Records the bottle numbers of the analytical subsets for each sample.
+- **DS-Bottle Numbers:** Records the bottle numbers of the analytical subsets for each sample.
 
 ```{r create-datasheets include=FALSE}
 create_datasheets(ids, saveloc, type="datasheet", open =TRUE, quiet=FALSE)
@@ -197,17 +197,17 @@ copy_label_template(saveloc, study, "field")
 
 6.  It will ask you to select which tab on your mailing list you are using.
 
-    -   For printing **field labels** choose `Labels-Field`
+    - For printing **field labels** choose `Labels-Field`
 
-    -   For printing **lab labels** choose `Labels-Lab`
+    - For printing **lab labels** choose `Labels-Lab`
 
-    -   Click **OK**.
+    - Click **OK**.
 
     > **Note:** Sometimes the window will shows doubles of your tabs. Not sure why. **Just click the top one.** It will still work.
 
 7.  Click **Insert Merge Field.** Then follow the specific directions below if you're printing out [field labels] or [lab labels].
 
-## Field Labels  
+## Field Labels
 
 1.  Choose **Sample_Name**. Then center the field in the center of the label and bold it.
 
@@ -263,9 +263,11 @@ copy_label_template(saveloc, study, "field")
 
     ![](images/clipboard-2758583050.png)
 
-7.   The final labels should look like
+7.  The final labels should look like
 
-    ![](images/clipboard-1173758715.png)
+```         
+![](images/clipboard-1173758715.png)
+```
 
 8.  Print.
 
